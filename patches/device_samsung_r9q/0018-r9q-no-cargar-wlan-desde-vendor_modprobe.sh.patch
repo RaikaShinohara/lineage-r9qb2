@@ -1,0 +1,43 @@
+From 981d2c35179767a2a24946ebde4090fbc5cf087c Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 15:57:26 +0000
+Subject: [PATCH 18/18] r9q: no cargar wlan desde vendor_modprobe.sh
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+vendor_modprobe.sh carga en early-init todos los módulos de
+modules.dep. wlan se queda esperando la calibración en frío de cnss2,
+que no empieza hasta post-fs-data, y init espera al exec: el arranque se
+paraba ~70 s en el logo hasta el timeout. Con la blocklist solo lo carga
+init.r9q.rc en on boot.
+
+Change-Id: Ib8739f9d1a6dfcd667ed7efb0b04703bbdc1d9d3
+---
+ BoardConfig.mk    | 4 ++++
+ modules.blocklist | 1 +
+ 2 files changed, 5 insertions(+)
+ create mode 100644 modules.blocklist
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 89397a7..15e0f90 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -26,6 +26,10 @@ BOARD_NAME                 := SRPVC21A007
+ 
+ # Kernel modules
+ BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules.load))
++# vendor_modprobe.sh (early-init) carga todos los módulos con -b: wlan espera a la
++# calibración de cnss2, que no llega hasta post-fs-data, y bloquearía init 70 s.
++# Lo carga init.r9q.rc en on boot
++BOARD_VENDOR_KERNEL_MODULES_BLOCKLIST_FILE := $(DEVICE_PATH)/modules.blocklist
+ BOARD_RECOVERY_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules.load.recovery))
+ RECOVERY_KERNEL_MODULES := $(BOARD_RECOVERY_RAMDISK_KERNEL_MODULES_LOAD)
+ 
+diff --git a/modules.blocklist b/modules.blocklist
+new file mode 100644
+index 0000000..0a590b4
+--- /dev/null
++++ b/modules.blocklist
+@@ -0,0 +1 @@
++blocklist wlan

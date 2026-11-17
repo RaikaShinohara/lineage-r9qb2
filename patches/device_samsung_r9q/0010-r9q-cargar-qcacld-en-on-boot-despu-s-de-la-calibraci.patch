@@ -1,0 +1,42 @@
+From 4431f0deb668973aa6bbaba00312b20e073c3115 Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 16:14:30 +0000
+Subject: [PATCH 10/18] =?UTF-8?q?r9q:=20cargar=20qcacld=20en=20on=20boot,?=
+ =?UTF-8?q?=20despu=C3=A9s=20de=20la=20calibraci=C3=B3n=20en=20fr=C3=ADo?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Desde modules.load, cnss2 lo rechaza ("Reject WLAN Driver insmod before
+CBC") y no aparece wlan0.
+Change-Id: I7772075920da3939fef61cffcf85821ce79f065c
+---
+ modules.load            | 1 -
+ rootdir/etc/init.r9q.rc | 5 +++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/modules.load b/modules.load
+index 88f67fc..cab8b0c 100644
+--- a/modules.load
++++ b/modules.load
+@@ -57,4 +57,3 @@ va_macro_dlkm.ko
+ wcd9xxx_dlkm.ko
+ wcd_core_dlkm.ko
+ wlan_firmware_service_v01.ko
+-wlan.ko
+diff --git a/rootdir/etc/init.r9q.rc b/rootdir/etc/init.r9q.rc
+index 6377b80..e0c7166 100755
+--- a/rootdir/etc/init.r9q.rc
++++ b/rootdir/etc/init.r9q.rc
+@@ -149,6 +149,11 @@ on boot
+     chown root system /sys/class/usb_notify/usb_control/usb_data_enabled
+     chmod 0664 /sys/class/usb_notify/usb_control/usb_data_enabled
+ 
++# WLAN: cnss2 rechaza qcacld antes de la calibración en frío, que arranca con
++# fs_ready en post-fs-data (init.target.rc); si sigue en curso, espera a que acabe
++on boot
++    exec_background u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -a -d /vendor/lib/modules wlan
++
+ # SWAP
+ on boot
+     write /proc/sys/vm/swappiness 160

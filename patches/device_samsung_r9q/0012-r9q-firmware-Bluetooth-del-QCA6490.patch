@@ -1,0 +1,28 @@
+From 02bad8679285beb87ad4134db97f5e3d8f5495c5 Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 16:28:31 +0000
+Subject: [PATCH 12/18] r9q: firmware Bluetooth del QCA6490
+
+Sin hpbtfw21.tlv y hpnv21*.baa el SoC no inicializa y el HAL de
+Bluetooth reinicia en bucle.
+Change-Id: I825e71b4d15b96aa3770d180f66fe8bb5b06c9bb
+---
+ proprietary-files.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 77f6f56..fb01ef1 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -645,3 +645,11 @@ vendor/lib64/com.qti.feature2.swmf.so
+ vendor/lib64/com.qti.settings.sm8350.so
+ vendor/lib64/libarcsoft_super_night_auto_raw.so
+ vendor/lib64/libcamerapostproc.so
++
++# Bluetooth - QCA6490 (sin esto: "Failed in opening and reading patch file")
++vendor/firmware/Data.msc
++vendor/firmware/bt_nvm_loading.xml
++vendor/firmware/bt_nvm_loading_2nd.xml
++vendor/firmware/hpbtfw21.tlv
++vendor/firmware/hpnv21.baa
++vendor/firmware/hpnv21g.baa

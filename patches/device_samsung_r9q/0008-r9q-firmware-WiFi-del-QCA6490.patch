@@ -1,0 +1,33 @@
+From 118a46898653d67ab0afb1de2f713cb9bb41ff6a Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 13:30:37 +0000
+Subject: [PATCH 08/18] r9q: firmware WiFi del QCA6490
+
+Sin vendor/firmware/qca6490/amss20.bin el chip no arranca y cnss2 hace
+BUG() al intentar recuperarse.
+Change-Id: I5dd78f1a6b1abc19f0ca9582fc8ef45cfc28051f
+---
+ proprietary-files.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index e77648f..2d4a469 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -578,3 +578,16 @@ vendor/lib/libthreadutils.so
+ vendor/lib64/libthreadutils.so
+ vendor/lib/libatccore.so;DISABLE_CHECKELF
+ vendor/lib64/libatccore.so
++
++# WiFi - QCA6490 (firmware de G990B2XXS7GXF1)
++vendor/firmware/qca6490/amss20.bin
++vendor/firmware/qca6490/bdwlan.elf
++vendor/firmware/qca6490/bdwlan.elf1
++vendor/firmware/qca6490/bdwlan.elf10
++vendor/firmware/qca6490/bdwlan.elf2
++vendor/firmware/qca6490/bdwlang.elf
++vendor/firmware/qca6490/bdwlang.elf1
++vendor/firmware/qca6490/bdwlang.elf10
++vendor/firmware/qca6490/bdwlang.elf2
++vendor/firmware/qca6490/m3.bin
++vendor/firmware/qca6490/regdb.bin

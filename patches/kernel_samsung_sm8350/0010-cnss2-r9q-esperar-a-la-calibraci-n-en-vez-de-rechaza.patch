@@ -1,0 +1,40 @@
+From 7fc3bd3232faf22b33dc16676d102a5a3bbe0eb0 Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 17:54:25 +0000
+Subject: [PATCH 10/12] =?UTF-8?q?cnss2:=20r9q:=20esperar=20a=20la=20calibr?=
+ =?UTF-8?q?aci=C3=B3n=20en=20vez=20de=20rechazar=20qcacld?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+init carga wlan.ko en on boot y a veces llega antes de que fs_ready
+lance la calibración en frío.
+Change-Id: I37fa858f978a45780e8b018d0ae07449dbcd6561
+---
+ drivers/net/wireless/cnss2/pci.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/net/wireless/cnss2/pci.c b/drivers/net/wireless/cnss2/pci.c
+index 788b91c33..a0004c62d 100644
+--- a/drivers/net/wireless/cnss2/pci.c
++++ b/drivers/net/wireless/cnss2/pci.c
+@@ -2891,6 +2891,19 @@ int cnss_wlan_register_driver(struct cnss_wlan_driver *driver_ops)
+ 	 */
+ 	if (test_bit(CNSS_IN_COLD_BOOT_CAL, &plat_priv->driver_state)) {
+ 		cnss_pr_dbg("Start to wait for calibration to complete\n");
++	} else if (IS_ENABLED(CONFIG_SEC_R9Q_PROJECT)) {
++		/* r9q: qcacld se carga desde init en on boot y puede llegar
++		 * antes de que fs_ready arranque la calibración: se espera a que
++		 * acabe y solo se rechaza si no llega a terminar.
++		 */
++		cnss_pr_dbg("Wait for calibration to start and complete\n");
++		timeout = cnss_get_timeout(plat_priv, CNSS_TIMEOUT_CALIBRATION);
++		if (!wait_for_completion_timeout(&plat_priv->cal_complete,
++						 msecs_to_jiffies(timeout))) {
++			cnss_pr_err("Reject WLAN Driver insmod before CBC\n");
++			return -EPERM;
++		}
++		goto register_driver;
+ 	} else {
+ 		cnss_pr_err("Reject WLAN Driver insmod before CBC\n");
+ 		return -EPERM;

@@ -1,0 +1,31 @@
+From 22b5a161a3cb7570812f5967874c4496365cd533 Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 20:47:40 +0000
+Subject: [PATCH 03/12] arm64: vdso32: ensamblador integrado y lld de clang
+Change-Id: I63ba0a988fc1cd17f94cbc784d5903c9dceee19b
+---
+ arch/arm64/kernel/vdso32/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/vdso32/Makefile b/arch/arm64/kernel/vdso32/Makefile
+index 2fac9dfc6..eedcfc058 100644
+--- a/arch/arm64/kernel/vdso32/Makefile
++++ b/arch/arm64/kernel/vdso32/Makefile
+@@ -15,7 +15,7 @@ COMPAT_GCC_TOOLCHAIN := $(realpath $(COMPAT_GCC_TOOLCHAIN_DIR)/..)
+ 
+ CC_COMPAT_CLANG_FLAGS := --target=arm-linux-gnueabi
+ CC_COMPAT_CLANG_FLAGS += --prefix=$(COMPAT_GCC_TOOLCHAIN_DIR)
+-CC_COMPAT_CLANG_FLAGS += -no-integrated-as -Qunused-arguments
++CC_COMPAT_CLANG_FLAGS += -fintegrated-as -Qunused-arguments
+ ifneq ($(COMPAT_GCC_TOOLCHAIN),)
+ CC_COMPAT_CLANG_FLAGS += --gcc-toolchain=$(COMPAT_GCC_TOOLCHAIN)
+ endif
+@@ -122,7 +122,7 @@ VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
+ VDSO_LDFLAGS += -nostdlib -shared -mfloat-abi=soft
+ VDSO_LDFLAGS += -Wl,--hash-style=sysv
+ VDSO_LDFLAGS += -Wl,--build-id
+-VDSO_LDFLAGS += $(call cc32-ldoption,-fuse-ld=bfd)
++VDSO_LDFLAGS += $(call cc32-ldoption,-fuse-ld=lld)
+ 
+ 
+ # Borrow vdsomunge.c from the arm vDSO

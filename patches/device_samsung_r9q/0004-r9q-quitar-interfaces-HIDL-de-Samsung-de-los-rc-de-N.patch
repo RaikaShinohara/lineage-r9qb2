@@ -1,0 +1,33 @@
+From 68b5b58746378f1db152534209e4c97f7f6e77dd Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 08:16:27 +0000
+Subject: [PATCH 04/18] =?UTF-8?q?r9q:=20quitar=20interfaces=20HIDL=20de=20?=
+ =?UTF-8?q?Samsung=20de=20los=20rc=20de=20NFC=20y=20c=C3=A1mara?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+host_init_verifier las rechaza porque no hay hidl_interface para ellas.
+Change-Id: I6adf940bbd0eee9fd0852e37a07ebc9384d45b5b
+---
+ extract-files.py | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/extract-files.py b/extract-files.py
+index d11191b..c5ddc56 100755
+--- a/extract-files.py
++++ b/extract-files.py
+@@ -23,6 +23,13 @@ namespace_imports = [
+ 
+ 
+ blob_fixups: blob_fixups_user_type = {
++    # Interfaces HIDL de Samsung sin hidl_interface en el build: host_init_verifier
++    # las rechaza. Los servicios se registran igual al arrancar con class hal
++    (
++        'vendor/etc/init/nxp.android.hardware.nfc@1.2-service.rc',
++        'vendor/etc/init/vendor.samsung.hardware.camera.provider@4.0-service_64.rc',
++    ): blob_fixup()
++        .regex_replace(r'\n[ \t]*interface vendor\.samsung\.hardware\.[^\n]*', ''),
+     'vendor/lib64/hw/camera.qcom.so': blob_fixup()
+         .binary_regex_replace(b'ro.boot.flash.locked', b'ro.camera.notify_nfc'),
+     'vendor/lib64/hw/com.qti.chi.override.so': blob_fixup()

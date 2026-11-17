@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Local manifest for LineageOS 23.2 on the Galaxy S21 FE Snapdragon (SM-G990B2, codename r9q).
+  Copy to .repo/local_manifests/ in a lineage-23.2 checkout, then run scripts/setup.sh, which
+  checks out the pinned base commits, applies patches/ on a local branch "b2" and copies vendor/.
+-->
+<manifest>
+    <project name="samsung-sm8350/android_device_samsung_sm8350-common" path="device/samsung/sm8350-common" remote="github" revision="lineage-23.0" />
+    <project name="samsung-sm8350/android_device_samsung_r9q" path="device/samsung/r9q" remote="github" revision="next-r9q" />
+    <!-- lineage-23.2 only carries the Flip3 (b2q); lineage-22 has the r9q DTs and defconfig -->
+    <project name="samsung-sm8350/android_kernel_samsung_sm8350" path="kernel/samsung/sm8350" remote="github" revision="lineage-22" clone-depth="1" />
+    <!-- AndroidKernelModule.mk for the kernel techpack Android.mk files -->
+    <project name="samsung-sm8350/android_device_qcom_common" path="device/qcom/common" remote="github" revision="lineage-22" />
+    <project name="LineageOS/android_hardware_samsung" path="hardware/samsung" remote="github" revision="lineage-23.2" />
+
+    <!-- clang and rust are cloned by hand (partial clone + sparse checkout of the versions the
+         build uses): with clone-depth=1 repo retries without depth and pulls ~95 GB of history.
+         See README.md, "Prebuilts". -->
+    <remove-project name="platform/prebuilts/clang/host/linux-x86" />
+    <remove-project name="platform/prebuilts/rust" />
+</manifest>

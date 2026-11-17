@@ -1,0 +1,20 @@
+From 6c8f69db04e8d283d866409054e294af5eb4205b Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 09:18:37 +0000
+Subject: [PATCH 07/12] qcacld-3.0: no tratar strict-prototypes como error
+Change-Id: I2e79bc5dd70c971994ee070fca453cb98d58d40d
+---
+ drivers/staging/qcacld-3.0/Kbuild | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/staging/qcacld-3.0/Kbuild b/drivers/staging/qcacld-3.0/Kbuild
+index ffedd1bc5..341401f86 100644
+--- a/drivers/staging/qcacld-3.0/Kbuild
++++ b/drivers/staging/qcacld-3.0/Kbuild
+@@ -3916,3 +3916,6 @@ OBJS_DIRS += $(dir $(OBJS)) \
+ CLEAN_DIRS := $(addsuffix *.o,$(sort $(OBJS_DIRS))) \
+ 	      $(addsuffix .*.o.cmd,$(sort $(OBJS_DIRS)))
+ clean-files := $(CLEAN_DIRS)
++
++# clang 19: el Makefile del kernel fuerza -Werror=strict-prototypes y el código de 2021 no lo cumple
++ccflags-y += -Wno-error=strict-prototypes

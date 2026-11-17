@@ -1,0 +1,29 @@
+From 1f58f8ecea78c466173de97fd2d4443a5d0234ff Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 22:00:47 +0000
+Subject: [PATCH 05/12] qcacld-3.0: incluir cnss2.h con CNSS2 (QCA6490 por
+ PCIe)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CONFIG_LITHIUM solo existe como variable de make, no como -D, así que
+se acababa incluyendo icnss2.h y faltaban las funciones sysfs de Samsung.
+Change-Id: I1725b7f0feea7a78fa4a5384d3b2e8ff865733e5
+---
+ drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c b/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
+index 942b01fc3..60f6ad753 100644
+--- a/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
++++ b/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
+@@ -85,7 +85,7 @@
+ #include <linux/ethtool.h>
+ 
+ #if defined (SEC_READ_MACADDR_SYSFS) || defined (SEC_WRITE_VERSION_IN_SYSFS) || defined (SEC_WRITE_SOFTAP_INFO_IN_SYSFS) || defined (SEC_CONFIG_PSM_SYSFS)
+-#ifdef CONFIG_LITHIUM
++#if defined(CONFIG_LITHIUM) || IS_ENABLED(CONFIG_CNSS2)
+ #include <net/cnss2.h>
+ #else
+ #include <soc/qcom/icnss2.h>

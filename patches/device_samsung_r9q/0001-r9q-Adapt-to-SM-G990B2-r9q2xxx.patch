@@ -1,0 +1,62 @@
+From de47a2bd6cd070966fcdc3cba20930842f5b40b1 Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 15:15:07 +0000
+Subject: [PATCH 01/18] r9q: Adapt to SM-G990B2 (r9q2xxx)
+
+Model, fingerprint and boot board name from stock G990B2XXS7GXF1,
+openx2 defconfig (board rev 14), kernel clang r547379 since r530567
+is no longer in the Android 16 prebuilts.
+
+Change-Id: I210e73e695d547b5f174723f001cdc977e406365
+Change-Id: I78cd3b1b0f3fceb3483fafb943f6eeb9e7224d19
+---
+ BoardConfig.mk | 8 +++++---
+ lineage_r9q.mk | 6 +++---
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index b2a5e32..89397a7 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -19,8 +19,10 @@ DEVICE_PATH := device/samsung/r9q
+ include device/samsung/sm8350-common/BoardConfigCommon.mk
+ 
+ # Kernel
+-TARGET_KERNEL_CONFIG        := vendor/r9q_eur_openx_defconfig
+-BOARD_NAME                  := SRPUH27A001
++TARGET_KERNEL_CONFIG        := vendor/r9q_eur_openx2_defconfig
++# r530567 (el del árbol común) ya no está en los prebuilts de Android 16
++TARGET_KERNEL_CLANG_VERSION := r547379
++BOARD_NAME                 := SRPVC21A007
+ 
+ # Kernel modules
+ BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules.load))
+@@ -37,7 +39,7 @@ TARGET_SCREEN_DENSITY := 450
+ TARGET_OTA_ASSERT_DEVICE := r9q
+ 
+ # Security patch
+-VENDOR_SECURITY_PATCH := 2024-09-01
++VENDOR_SECURITY_PATCH := 2024-06-01
+ 
+ # UDFPS
+ TARGET_SURFACEFLINGER_UDFPS_LIB := //$(DEVICE_PATH):libudfps_extension.r9q
+diff --git a/lineage_r9q.mk b/lineage_r9q.mk
+index 3ac84ed..a2acd03 100644
+--- a/lineage_r9q.mk
++++ b/lineage_r9q.mk
+@@ -37,12 +37,12 @@ TARGET_SCREEN_WIDTH := 1080
+ PRODUCT_NAME := lineage_r9q
+ PRODUCT_DEVICE := r9q
+ PRODUCT_BRAND := samsung
+-PRODUCT_MODEL := SM-G990B
++PRODUCT_MODEL := SM-G990B2
+ PRODUCT_MANUFACTURER := samsung
+ PRODUCT_GMS_CLIENTID_BASE := android-samsung-ss
+ 
+ PRODUCT_SHIPPING_API_LEVEL := 31
+ 
+ # Vendor fingerprint
+-BUILD_FINGERPRINT := "samsung/r9qxxx/r9q:11/RP1A.200720.012/G990BXXSBGXJ3:user/release-keys"
+-PRIVATE_BUILD_DESC := "r9qxxx-user 11 RP1A.200720.012 G990BXXSBGXJ3 release-keys"
++BUILD_FINGERPRINT := "samsung/r9q2xxx/r9q:11/RP1A.200720.012/G990B2XXS7GXF1:user/release-keys"
++PRIVATE_BUILD_DESC := "r9q2xxx-user 11 RP1A.200720.012 G990B2XXS7GXF1 release-keys"

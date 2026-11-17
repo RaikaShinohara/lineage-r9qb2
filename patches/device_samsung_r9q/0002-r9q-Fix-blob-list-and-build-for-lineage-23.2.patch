@@ -1,0 +1,159 @@
+From 623124657ce106c442fd0f33785efb5b3ff9397d Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 16:20:05 +0000
+Subject: [PATCH 02/18] r9q: Fix blob list and build for lineage-23.2
+
+Drop blobs that AOSP/CAF now build for vendor (camera HIDL, gralloc
+utils), keep the stock audio HAL under a renamed module, add the
+camera/RIL blob dependencies missing from the list and dedupe entries
+already in sm8350-common.
+Change-Id: I30edd4235ce6f02ec88f8aabcaa3054bf755fa72
+---
+ proprietary-files.txt | 107 ++++++++++++++++++++++++++++++++----------
+ 1 file changed, 82 insertions(+), 25 deletions(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index b8dd4cc..bfc7504 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -7,7 +7,8 @@ vendor/firmware/cs35l40-rcv-dsp1-spk-prot-calib.bin
+ vendor/firmware/cs35l40-rcv-dsp1-spk-prot.bin
+ vendor/firmware/cs35l40-rcv-dsp1-spk-prot.wmfw
+ vendor/firmware/dax_param.bin
+-vendor/lib/hw/audio.primary.lahaina.so
++# HAL de stock; CAF también define audio.primary.lahaina, así que se renombra el módulo
++vendor/lib/hw/audio.primary.lahaina.so;MODULE_SUFFIX=_samsung
+ vendor/lib/libspeakercalibration.so
+ 
+ # ACDB
+@@ -30,6 +31,7 @@ vendor/firmware/ipa_fws.elf
+ vendor/firmware/ipa_fws.mdt
+ 
+ # Camera
++system/lib64/vendor.samsung.hardware.camera.device-V1-ndk.so
+ system/lib64/vendor.samsung.hardware.camera.provider-V1-ndk.so
+ vendor/etc/permissions/vendor.android.hardware.camera.preview-dis.back.xml
+ vendor/etc/portrait_data/LF_segmenter/LF_segmenter_cnn.dlc
+@@ -292,26 +294,26 @@ vendor/lib64/libremosaic_wrapper.so
+ vendor/lib64/libtriplecam_optical_zoom_control.so
+ vendor/lib64/libtriplecam_video_optical_zoom.so
+ vendor/lib64/libvdis.uniplugin@1.0.so
+-vendor/lib64/sensors.ssc.so
+-vendor/lib64/vendor.qti.hardware.camera.device@1.0.so
++# ya en sm8350-common: vendor/lib64/sensors.ssc.so
++# lo compila AOSP/CAF: vendor/lib64/vendor.qti.hardware.camera.device@1.0.so
+ 
+ # Camera stock stack
+-system/lib64/android.hardware.camera.common@1.0.so:vendor/lib64/android.hardware.camera.common@1.0.so
+-system/lib64/android.hardware.camera.device@1.0.so:vendor/lib64/android.hardware.camera.device@1.0.so
+-system/lib64/android.hardware.camera.device@3.2.so:vendor/lib64/android.hardware.camera.device@3.2.so
+-system/lib64/android.hardware.camera.device@3.3.so:vendor/lib64/android.hardware.camera.device@3.3.so
+-system/lib64/android.hardware.camera.device@3.4.so:vendor/lib64/android.hardware.camera.device@3.4.so
+-system/lib64/android.hardware.camera.device@3.5.so:vendor/lib64/android.hardware.camera.device@3.5.so
+-system/lib64/android.hardware.camera.device@3.6.so:vendor/lib64/android.hardware.camera.device@3.6.so
+-system/lib64/android.hardware.camera.device@3.7.so:vendor/lib64/android.hardware.camera.device@3.7.so
+-system/lib64/android.hardware.camera.metadata@3.2.so:vendor/lib64/android.hardware.camera.metadata@3.2.so
+-system/lib64/android.hardware.camera.metadata@3.3.so:vendor/lib64/android.hardware.camera.metadata@3.3.so
+-system/lib64/android.hardware.camera.metadata@3.4.so:vendor/lib64/android.hardware.camera.metadata@3.4.so
+-system/lib64/android.hardware.camera.metadata@3.5.so:vendor/lib64/android.hardware.camera.metadata@3.5.so
+-system/lib64/android.hardware.camera.metadata@3.6.so:vendor/lib64/android.hardware.camera.metadata@3.6.so
+-system/lib64/android.hardware.camera.provider@2.4.so:vendor/lib64/android.hardware.camera.provider@2.4.so
+-system/lib64/android.hardware.camera.provider@2.5.so:vendor/lib64/android.hardware.camera.provider@2.5.so
+-system/lib64/android.hardware.camera.provider@2.6.so:vendor/lib64/android.hardware.camera.provider@2.6.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.common@1.0.so:vendor/lib64/android.hardware.camera.common@1.0.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@1.0.so:vendor/lib64/android.hardware.camera.device@1.0.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.2.so:vendor/lib64/android.hardware.camera.device@3.2.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.3.so:vendor/lib64/android.hardware.camera.device@3.3.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.4.so:vendor/lib64/android.hardware.camera.device@3.4.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.5.so:vendor/lib64/android.hardware.camera.device@3.5.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.6.so:vendor/lib64/android.hardware.camera.device@3.6.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.device@3.7.so:vendor/lib64/android.hardware.camera.device@3.7.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.metadata@3.2.so:vendor/lib64/android.hardware.camera.metadata@3.2.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.metadata@3.3.so:vendor/lib64/android.hardware.camera.metadata@3.3.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.metadata@3.4.so:vendor/lib64/android.hardware.camera.metadata@3.4.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.metadata@3.5.so:vendor/lib64/android.hardware.camera.metadata@3.5.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.metadata@3.6.so:vendor/lib64/android.hardware.camera.metadata@3.6.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.provider@2.4.so:vendor/lib64/android.hardware.camera.provider@2.4.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.provider@2.5.so:vendor/lib64/android.hardware.camera.provider@2.5.so
++# lo compila AOSP/CAF: system/lib64/android.hardware.camera.provider@2.6.so:vendor/lib64/android.hardware.camera.provider@2.6.so
+ vendor/bin/hw/vendor.samsung.hardware.camera.provider@4.0-service_64
+ vendor/etc/init/vendor.samsung.hardware.camera.provider@4.0-service_64.rc
+ vendor/lib/libloc_api_wds.so
+@@ -321,9 +323,10 @@ vendor/lib64/camera.device@3.3-impl.so
+ vendor/lib64/camera.device@3.4-impl.so
+ vendor/lib64/camera.device@3.5-impl.so
+ vendor/lib64/libPetDetector_interface.so
+-vendor/lib64/libgrallocusage.so
+-vendor/lib64/libgrallocutils.so
+-vendor/lib64/libqc2filter.so
++# lo compila AOSP (system/core/libgrallocusage, vendor_available)
++# vendor/lib64/libgrallocusage.so
++# lo compila AOSP/CAF: vendor/lib64/libgrallocutils.so
++# ya en sm8350-common: vendor/lib64/libqc2filter.so
+ vendor/lib64/vendor.samsung.hardware.camera.device@5.0-impl.so
+ vendor/lib64/vendor.samsung.hardware.camera.device@5.0.so
+ vendor/lib64/vendor.samsung.hardware.camera.provider@4.0-legacy.so
+@@ -518,6 +521,60 @@ vendor/lib64/nfc_nci_nxpsn.so
+ vendor/lib64/vendor.samsung.hardware.nfc@2.0.so
+ 
+ # Sensors
+-vendor/lib/sensors.grip.so
+-vendor/lib/sensors.ssc.so
+-vendor/lib64/sensors.grip.so
++# ya en sm8350-common: vendor/lib/sensors.grip.so
++# ya en sm8350-common: vendor/lib/sensors.ssc.so
++# ya en sm8350-common: vendor/lib64/sensors.grip.so
++
++# Dependencias de blobs que faltaban en la lista (stock G990B2XXS7GXF1)
++vendor/lib/libmpbase.so
++vendor/lib64/libmpbase.so
++vendor/lib/libopencv.so
++vendor/lib64/libopencv.so
++vendor/lib/libchilog.so
++vendor/lib64/libchilog.so
++vendor/lib/libsnap_vndk.so
++vendor/lib64/libsnap_vndk.so
++vendor/lib/libofflinelog.so
++vendor/lib64/libofflinelog.so
++vendor/lib/libtswrappercommon.so
++vendor/lib64/libtswrappercommon.so
++vendor/lib/libcom.qti.chinodeutils.so
++vendor/lib64/libcom.qti.chinodeutils.so
++vendor/lib/libuniplugin.so
++vendor/lib64/libuniplugin.so
++vendor/lib/libsensorlistener.so
++vendor/lib64/libsensorlistener.so
++vendor/lib/libsrib_videobokeh_engine.camera.samsung.so
++vendor/lib64/libsrib_videobokeh_engine.camera.samsung.so
++vendor/lib/libsrib_CNNInterface.camera.samsung.so
++vendor/lib64/libsrib_CNNInterface.camera.samsung.so
++vendor/lib/libOpenCv.camera.samsung.so
++vendor/lib64/libOpenCv.camera.samsung.so
++vendor/lib/com.qti.stats.common.so
++vendor/lib64/com.qti.stats.common.so
++vendor/lib/libObjectDetector_v1.camera.samsung.so
++vendor/lib64/libObjectDetector_v1.camera.samsung.so
++vendor/lib/libMoonVerifier_v1.camera.samsung.so
++vendor/lib64/libMoonVerifier_v1.camera.samsung.so
++vendor/lib/libtriplecam_image_optical_zoom.so
++vendor/lib64/libtriplecam_image_optical_zoom.so
++vendor/lib/libbitmlengine.so
++vendor/lib64/libbitmlengine.so
++vendor/lib/libmmcamera_mfnr.so
++vendor/lib64/libmmcamera_mfnr.so
++vendor/lib/libvdis_core.so
++vendor/lib64/libvdis_core.so
++vendor/lib/libbitmlenginev2.so
++vendor/lib64/libbitmlenginev2.so
++vendor/lib/vendor.qti.hardware.camera.postproc@1.0-service-impl.so
++vendor/lib64/vendor.qti.hardware.camera.postproc@1.0-service-impl.so
++vendor/lib/libofflinedump.so
++vendor/lib64/libofflinedump.so
++vendor/lib/libsynx.so
++vendor/lib64/libsynx.so
++vendor/lib/libos.so
++vendor/lib64/libos.so
++vendor/lib/libthreadutils.so
++vendor/lib64/libthreadutils.so
++vendor/lib/libatccore.so
++vendor/lib64/libatccore.so

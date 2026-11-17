@@ -1,0 +1,22 @@
+From 6fc58632b3153ee9f20d41fae97e18ee2caf91bc Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 08:50:39 +0000
+Subject: [PATCH 06/12] qcacld-3.0: no tratar avisos como errores con clang 19
+Change-Id: I45aec76598de5c25c7528b0fd0743478a2b80381
+---
+ drivers/staging/qcacld-3.0/Kbuild | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/qcacld-3.0/Kbuild b/drivers/staging/qcacld-3.0/Kbuild
+index 4da4ab186..ffedd1bc5 100644
+--- a/drivers/staging/qcacld-3.0/Kbuild
++++ b/drivers/staging/qcacld-3.0/Kbuild
+@@ -2611,7 +2611,7 @@ ccflags-y += $(INCS)
+ 
+ cppflags-y +=	-DANI_OS_TYPE_ANDROID=6 \
+ 		-Wall\
+-		-Werror\
++		-Wno-error\
+ 		-D__linux__
+ 
+ cppflags-$(CONFIG_THERMAL_STATS_SUPPORT) += -DTHERMAL_STATS_SUPPORT

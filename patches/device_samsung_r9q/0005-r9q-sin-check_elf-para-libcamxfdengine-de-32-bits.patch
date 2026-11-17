@@ -1,0 +1,24 @@
+From 2a54eb9fef2106689977f3dfd0c58364d367cc2f Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 08:54:14 +0000
+Subject: [PATCH 05/18] r9q: sin check_elf para libcamxfdengine de 32 bits
+
+__aeabi_uldivmod lo resuelve la libgcc del propio vendor.
+Change-Id: I1ae440d3d52fedf2fb3304bc4eeb19567684c897
+---
+ proprietary-files.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index bfc7504..fc49559 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -144,7 +144,7 @@ vendor/lib/libcamera_nn_stub.so
+ vendor/lib/libcamxexternalformatutils.so
+ vendor/lib/libcamxfacialfeatures.so
+ vendor/lib/libcamxfdalgo.so
+-vendor/lib/libcamxfdengine.so
++vendor/lib/libcamxfdengine.so;DISABLE_CHECKELF
+ vendor/lib/libcamxifestriping.so
+ vendor/lib/libcamximageformatutils.so
+ vendor/lib/libcamxqsatalgo.so

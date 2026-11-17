@@ -1,0 +1,74 @@
+From ea80b8f1fa7acc5e553ee207b759728aa2cdbaed Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 21:34:22 +0000
+Subject: [PATCH 6/7] =?UTF-8?q?sm8350-common:=20shim=20de=20libsensorndkbr?=
+ =?UTF-8?q?idge=20para=20la=20c=C3=A1mara?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+La libsensorndkbridge de Samsung exporta ALooper_forCamera,
+ALooper_pollOnce_camera y ALooper_release_forCamera, que la de AOSP no
+tiene. Se implementan sobre la ALooper de AOSP.
+
+Change-Id: I2ff696b0633ff23bf4069ae06604f2f8d73bdfb4
+---
+ common.mk                            |  1 +
+ shims/libsensorndkbridge/ALooper.cpp | 20 ++++++++++++++++++++
+ shims/libsensorndkbridge/Android.bp  |  8 ++++++++
+ 3 files changed, 29 insertions(+)
+ create mode 100644 shims/libsensorndkbridge/ALooper.cpp
+ create mode 100644 shims/libsensorndkbridge/Android.bp
+
+diff --git a/common.mk b/common.mk
+index 474870e..1a5f75a 100644
+--- a/common.mk
++++ b/common.mk
+@@ -146,6 +146,7 @@ PRODUCT_PACKAGES += \
+     libdl.vendor \
+     libui_shim.vendor \
+     libhidlbase_shim_sm8350.vendor \
++    libsensorndkbridge_shim \
+     android.hardware.camera.device@3.6.vendor \
+     android.hardware.camera.provider@2.5.vendor \
+     android.hardware.camera.provider@2.6.vendor \
+diff --git a/shims/libsensorndkbridge/ALooper.cpp b/shims/libsensorndkbridge/ALooper.cpp
+new file mode 100644
+index 0000000..08f4f4c
+--- /dev/null
++++ b/shims/libsensorndkbridge/ALooper.cpp
+@@ -0,0 +1,20 @@
++#include "ALooper.h"
++
++// La libsensorndkbridge de Samsung da a la cámara loopers propios en vez del
++// global de ALooper_prepare (libsensorlistener, libvdis_core, libhypermotion_core)
++extern "C" {
++
++ALooper* ALooper_forCamera() {
++    return new ALooper;
++}
++
++int ALooper_pollOnce_camera(ALooper* looper, int timeoutMillis, int* outFd, int* outEvents,
++                            void** outData) {
++    return looper->pollOnce(timeoutMillis, outFd, outEvents, outData);
++}
++
++void ALooper_release_forCamera(ALooper* looper) {
++    delete looper;
++}
++
++}
+diff --git a/shims/libsensorndkbridge/Android.bp b/shims/libsensorndkbridge/Android.bp
+new file mode 100644
+index 0000000..5b93e3a
+--- /dev/null
++++ b/shims/libsensorndkbridge/Android.bp
+@@ -0,0 +1,8 @@
++cc_library_shared {
++    name: "libsensorndkbridge_shim",
++    header_libs: ["libbase_headers"],
++    shared_libs: ["libsensorndkbridge", "libutils"],
++    include_dirs: ["frameworks/hardware/interfaces/sensorservice/libsensorndkbridge"],
++    srcs: ["ALooper.cpp"],
++    vendor: true,
++}

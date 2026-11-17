@@ -1,0 +1,27 @@
+From c4cd5d24666b7031f6440f608e32e8e62afbe92e Mon Sep 17 00:00:00 2001
+From: Icesito <113939920+Icesito68@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 17:55:58 +0000
+Subject: [PATCH 01/12] uapi: no exportar sched_param (choca con bionic de
+ Android 16)
+Change-Id: Ie7fd66cf7480b97d2c6bf94b17217190b6fea484
+---
+ include/uapi/linux/sched/types.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/uapi/linux/sched/types.h b/include/uapi/linux/sched/types.h
+index c852153dd..498bc35f1 100644
+--- a/include/uapi/linux/sched/types.h
++++ b/include/uapi/linux/sched/types.h
+@@ -4,9 +4,12 @@
+ 
+ #include <linux/types.h>
+ 
++/* bionic ya define sched_param en <sched.h>: solo se exporta al kernel */
++#ifdef __KERNEL__
+ struct sched_param {
+ 	int sched_priority;
+ };
++#endif
+ 
+ #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
+ #define SCHED_ATTR_SIZE_VER1	56	/* add: util_{min,max} */
