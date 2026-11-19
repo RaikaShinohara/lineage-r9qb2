@@ -98,7 +98,9 @@ To regenerate the blobs from a stock `vendor.img` instead, mount or unpack it an
 
 ## Main changes
 
-**Kernel**
+**Kernel** (GPL-2.0 source of the released kernel: branch
+[`lineage-23.2-sm-g990b2`](https://github.com/RaikaShinohara/android_kernel_samsung_sm8350/tree/lineage-23.2-sm-g990b2)
+of RaikaShinohara/android_kernel_samsung_sm8350, the same 12 commits as `patches/kernel_samsung_sm8350/`)
 
 - Android 16 build fixes: uapi `sched_param`, vDSO32 with clang and lld.
 - QCA6490 Wi-Fi: build `qcacld-3.0` as `wlan.ko`; `cnss2` waits for cold-boot calibration instead
