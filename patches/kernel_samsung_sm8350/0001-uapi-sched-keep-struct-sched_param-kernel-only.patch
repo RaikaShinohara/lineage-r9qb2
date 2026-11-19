@@ -1,0 +1,27 @@
+From 958486033fdc332571c6340437e1ab21f197250a Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 17:55:58 +0000
+Subject: [PATCH 01/12] uapi: sched: keep struct sched_param kernel-only
+
+Avoids a redefinition with bionic on Android 16.
+---
+ include/uapi/linux/sched/types.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/uapi/linux/sched/types.h b/include/uapi/linux/sched/types.h
+index c852153dd..1ea766f78 100644
+--- a/include/uapi/linux/sched/types.h
++++ b/include/uapi/linux/sched/types.h
+@@ -4,9 +4,12 @@
+ 
+ #include <linux/types.h>
+ 
++/* bionic already defines sched_param in <sched.h>: keep it kernel-only */
++#ifdef __KERNEL__
+ struct sched_param {
+ 	int sched_priority;
+ };
++#endif
+ 
+ #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
+ #define SCHED_ATTR_SIZE_VER1	56	/* add: util_{min,max} */

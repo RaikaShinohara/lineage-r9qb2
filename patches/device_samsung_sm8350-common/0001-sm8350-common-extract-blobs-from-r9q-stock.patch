@@ -1,0 +1,114 @@
+From 2c62c44a872848cd1883ecc20a336de8e06d5c93 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 15:15:07 +0000
+Subject: [PATCH 1/7] sm8350-common: extract blobs from r9q stock
+
+---
+ proprietary-files.txt | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 58f0798..f2dbc8b 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -408,11 +408,11 @@ vendor/lib64/libdiag.so
+ vendor/lib64/vendor.qti.diaghal@1.0.so;MODULE_SUFFIX=_vendor
+ 
+ # Display - from XQ-BC72 61.2.A.0.410
+-vendor/lib64/libdpps.so|42c8b6f9d85288037bde81dd996994231d420a09
++vendor/lib64/libdpps.so
+ vendor/lib64/librcmask.so|8feb479fe590b6aec282ce3342574d9113f80516
+ vendor/lib64/libsdm-diag.so|393c9ad3e3ad3210515900627f65bf6e3633226e
+-vendor/lib64/libsdmextension.so|4c32026ff8cb1270081881d4def7a2ad05ad0b80
+-vendor/lib64/libdisplayskuutils.so|37e4d543c696a5c9f0c1b44fd7299a0bc7dba5e8
++vendor/lib64/libsdmextension.so
++vendor/lib64/libdisplayskuutils.so
+ vendor/lib64/libsdm-color.so|a83576915a146492d430711e273b9af9a95d4fed
+ vendor/lib64/libqrtrclient.so|2474a708487c269c04afffbf755fff1686c6011c
+ 
+@@ -581,8 +581,8 @@ vendor/lib64/libsec-ril.so
+ vendor/lib/libsecril-client.so
+ vendor/lib64/libsecril-client.so
+ vendor/lib64/libril_sem.so
+-vendor/lib64/libVendorSemTelephonyProps.so
+-vendor/lib64/libVendorSemDataProps.so
++# not present on r9q: vendor/lib64/libVendorSemTelephonyProps.so
++# not present on r9q: vendor/lib64/libVendorSemDataProps.so
+ vendor/etc/init/dataadpl.rc
+ vendor/etc/init/ipacm-diag.rc
+ vendor/etc/init/vendor.qti.tftp.rc
+@@ -592,8 +592,8 @@ vendor/etc/locale/plmn_delta_zh-rTW.bin
+ vendor/etc/locale/plmn_delta_zh-rHK.bin
+ vendor/etc/plmn_delta.bin
+ vendor/etc/plmn_delta_usagsm.bin
+-vendor/etc/plmn_delta_ltn.bin
+-vendor/etc/plmn_se13_prebuilt.bin
++# not present on r9q: vendor/etc/plmn_delta_ltn.bin
++# not present on r9q: vendor/etc/plmn_se13_prebuilt.bin
+ vendor/etc/sec_config_oem
+ vendor/etc/pdpcnt-conf.xml
+ vendor/lib64/libnlnetmgr.so;DISABLE_CHECKELF
+@@ -616,7 +616,7 @@ vendor/lib/libnetmgr_common.so
+ vendor/etc/sensors/config/lahaina_ak991x_0.json
+ vendor/etc/sensors/config/faroe_idp_ak991x_0.json
+ vendor/etc/sensors/config/sns_fmv_legacy.json
+-vendor/etc/sensors/config/lahaina_ak997x_5.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_ak997x_5.json
+ vendor/etc/sensors/config/sns_flip_state.json
+ vendor/etc/sensors/config/sns_facing.json
+ vendor/etc/sensors/config/faroe_vertigo_lsm6dst_0.json
+@@ -625,15 +625,15 @@ vendor/etc/sensors/config/lahaina_hdk_lsm6dst_1.json
+ vendor/etc/sensors/config/sns_hw_revision.json
+ vendor/etc/sensors/config/faroe_power_0.json
+ vendor/etc/sensors/config/sns_basic_gestures.json
+-vendor/etc/sensors/config/lsm6dso_1.json
++# not present on r9q: vendor/etc/sensors/config/lsm6dso_1.json
+ vendor/etc/sensors/config/sns_device_orient.json
+ vendor/etc/sensors/config/sns_direct_channel.json
+ vendor/etc/sensors/config/faroe_default_sensors.json
+-vendor/etc/sensors/config/lahaina_tcs340x_0.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_tcs340x_0.json
+ vendor/etc/sensors/config/sns_dpc.json
+ vendor/etc/sensors/config/lahaina_default_sensors.json
+ vendor/etc/sensors/config/faroe_ak991x_0.json
+-vendor/etc/sensors/config/lahaina_ak991x_5.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_ak991x_5.json
+ vendor/etc/sensors/config/sns_smd.json
+ vendor/etc/sensors/config/faroe_tmd3702_0.json
+ vendor/etc/sensors/config/sns_bring_to_ear.json
+@@ -652,13 +652,13 @@ vendor/etc/sensors/config/sns_mag_cal.json
+ vendor/etc/sensors/config/sns_dae.json
+ vendor/etc/sensors/config/faroe_dynamic_sensors.json
+ vendor/etc/sensors/config/sns_amd_sw_disabled.json
+-vendor/etc/sensors/config/lahaina_lsm6dso_1_0.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_lsm6dso_1_0.json
+ vendor/etc/sensors/config/faroe_lsm6dst_1.json
+-vendor/etc/sensors/config/lahaina_ak991x_2.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_ak991x_2.json
+ vendor/etc/sensors/config/faroe_qrd_tmd3702_0.json
+ vendor/etc/sensors/config/faroe_qrd_ak991x_0.json
+ vendor/etc/sensors/config/lsm6dso_0.json
+-vendor/etc/sensors/config/lahaina_ak991x_7.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_ak991x_7.json
+ vendor/etc/sensors/config/sns_cm.json
+ vendor/etc/sensors/config/kodiak_qrd_ak991x_0.json
+ vendor/etc/sensors/config/lahaina_hdk_sx932x_0.json
+@@ -671,15 +671,15 @@ vendor/etc/sensors/config/sns_gyro_cal.json
+ vendor/etc/sensors/config/sns_multishake.json
+ vendor/etc/sensors/config/faroe_lsm6dst_0.json
+ vendor/etc/sensors/config/faroe_qrd_sx932x_0.json
+-vendor/etc/sensors/config/lahaina_lsm6dso_1_7.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_lsm6dso_1_7.json
+ vendor/etc/sensors/config/sns_tilt_sw_enabled.json
+ vendor/etc/sensors/config/faroe_irq.json
+ vendor/etc/sensors/config/sns_rmd.json
+ vendor/etc/sensors/config/sns_tilt_to_wake.json
+ vendor/etc/sensors/config/sns_fmv.json
+ vendor/etc/sensors/config/sns_tilt.json
+-vendor/etc/sensors/config/lahaina_ak997x_0.json
+-vendor/etc/sensors/config/lahaina_lidangle_0.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_ak997x_0.json
++# not present on r9q: vendor/etc/sensors/config/lahaina_lidangle_0.json
+ vendor/etc/sensors/config/lahaina_power_0.json
+ vendor/etc/sensors/config/faroe_sx932x_0.json
+ vendor/etc/sensors/config/lahaina_stk3a9x_0.json

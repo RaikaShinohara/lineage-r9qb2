@@ -1,0 +1,44 @@
+From 8ad6b6bc912a9401a71da84e212b0d59d188bd5e Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 09:18:47 +0000
+Subject: [PATCH 07/18] r9q: skip check_elf for blobs with missing symbols
+
+---
+ proprietary-files.txt | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 4885819..f6ca6aa 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -517,7 +517,7 @@ vendor/bin/hw/nxp.android.hardware.nfc@1.2-service
+ vendor/etc/init/nxp.android.hardware.nfc@1.2-service.rc
+ vendor/etc/libnfc-nxp.conf
+ vendor/etc/nfc/libnfc-nxp_RF.conf
+-vendor/lib64/nfc_nci_nxpsn.so
++vendor/lib64/nfc_nci_nxpsn.so;DISABLE_CHECKELF
+ vendor/lib64/vendor.samsung.hardware.nfc@2.0.so
+ 
+ # Sensors
+@@ -542,8 +542,8 @@ vendor/lib/libcom.qti.chinodeutils.so;DISABLE_CHECKELF
+ vendor/lib64/libcom.qti.chinodeutils.so
+ vendor/lib/libuniplugin.so
+ vendor/lib64/libuniplugin.so
+-vendor/lib/libsensorlistener.so
+-vendor/lib64/libsensorlistener.so
++vendor/lib/libsensorlistener.so;DISABLE_CHECKELF
++vendor/lib64/libsensorlistener.so;DISABLE_CHECKELF
+ vendor/lib/libsrib_videobokeh_engine.camera.samsung.so;DISABLE_CHECKELF
+ vendor/lib64/libsrib_videobokeh_engine.camera.samsung.so
+ vendor/lib/libsrib_CNNInterface.camera.samsung.so;DISABLE_CHECKELF
+@@ -562,8 +562,8 @@ vendor/lib/libbitmlengine.so;DISABLE_CHECKELF
+ vendor/lib64/libbitmlengine.so
+ vendor/lib/libmmcamera_mfnr.so;DISABLE_CHECKELF
+ vendor/lib64/libmmcamera_mfnr.so
+-vendor/lib/libvdis_core.so
+-vendor/lib64/libvdis_core.so
++vendor/lib/libvdis_core.so;DISABLE_CHECKELF
++vendor/lib64/libvdis_core.so;DISABLE_CHECKELF
+ vendor/lib/libbitmlenginev2.so;DISABLE_CHECKELF
+ vendor/lib64/libbitmlenginev2.so
+ vendor/lib/vendor.qti.hardware.camera.postproc@1.0-service-impl.so;DISABLE_CHECKELF

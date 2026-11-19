@@ -1,0 +1,33 @@
+From a7b2f0fab4cd016540cf5e5e9402d6029dc7cb50 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 09:18:47 +0000
+Subject: [PATCH 4/7] sm8350-common: skip check_elf for blobs with missing
+ symbols
+
+---
+ proprietary-files.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 585dda7..5f6b079 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -427,14 +427,14 @@ vendor/gpu/kbc/unified_ksqs.bin
+ # IOP
+ vendor/bin/hw/vendor.qti.hardware.iop@2.0-service
+ vendor/etc/init/vendor.qti.hardware.iop@2.0-service.rc
+-vendor/lib/libqti-iopd.so
++vendor/lib/libqti-iopd.so;DISABLE_CHECKELF
+ vendor/lib/vendor.qti.hardware.iop@1.0.so
+ vendor/lib/vendor.qti.hardware.iop@2.0.so
+-vendor/lib/libqti-iopd-client.so
+-vendor/lib64/libqti-iopd.so
++vendor/lib/libqti-iopd-client.so;DISABLE_CHECKELF
++vendor/lib64/libqti-iopd.so;DISABLE_CHECKELF
+ vendor/lib64/vendor.qti.hardware.iop@1.0.so
+ vendor/lib64/vendor.qti.hardware.iop@2.0.so
+-vendor/lib64/libqti-iopd-client.so
++vendor/lib64/libqti-iopd-client.so;DISABLE_CHECKELF
+ 
+ # IPA
+ vendor/etc/init/ipa_fws.rc

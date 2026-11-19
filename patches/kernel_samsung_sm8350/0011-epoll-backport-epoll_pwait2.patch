@@ -1,0 +1,181 @@
+From 774a2c03fdba7adb690c47dd0487ee1b7f5af09a Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 21:24:00 +0000
+Subject: [PATCH 11/12] epoll: backport epoll_pwait2
+
+Needed by BLASTBufferQueue on Android 16.
+---
+ arch/arm64/include/asm/unistd.h   |  2 +-
+ arch/arm64/include/asm/unistd32.h |  2 +
+ fs/eventpoll.c                    | 64 +++++++++++++++++++++++++++++++
+ include/linux/compat.h            |  6 +++
+ include/linux/syscalls.h          |  5 +++
+ include/uapi/asm-generic/unistd.h |  4 +-
+ kernel/sys_ni.c                   |  2 +
+ 7 files changed, 83 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index b3b2019f8..86a9d7b3e 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -38,7 +38,7 @@
+ #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE + 5)
+ #define __ARM_NR_COMPAT_END		(__ARM_NR_COMPAT_BASE + 0x800)
+ 
+-#define __NR_compat_syscalls		441
++#define __NR_compat_syscalls		442
+ #endif
+ 
+ #define __ARCH_WANT_SYS_CLONE
+diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+index 52879c7aa..28d24d4b6 100644
+--- a/arch/arm64/include/asm/unistd32.h
++++ b/arch/arm64/include/asm/unistd32.h
+@@ -881,6 +881,8 @@ __SYSCALL(__NR_pidfd_open, sys_pidfd_open)
+ __SYSCALL(__NR_clone3, sys_clone3)
+ #define __NR_process_madvise 440
+ __SYSCALL(__NR_process_madvise, sys_process_madvise)
++#define __NR_epoll_pwait2 441
++__SYSCALL(__NR_epoll_pwait2, compat_sys_epoll_pwait2)
+ 
+ /*
+  * Please add new compat syscalls above this comment and update
+diff --git a/fs/eventpoll.c b/fs/eventpoll.c
+index f2f92e3ec..ffc4851b8 100644
+--- a/fs/eventpoll.c
++++ b/fs/eventpoll.c
+@@ -2366,7 +2366,71 @@ SYSCALL_DEFINE6(epoll_pwait, int, epfd, struct epoll_event __user *, events,
+ 	return error;
+ }
+ 
++/*
++ * epoll_pwait2 backport (Linux 5.11), used by BLASTBufferQueue on Android 16.
++ * ep_poll on 5.4 works in milliseconds, so the timeout is rounded up.
++ */
++static int epoll_timespec_to_ms(const struct __kernel_timespec __user *timeout)
++{
++	struct timespec64 ts;
++	s64 ms;
++
++	if (!timeout)
++		return -1;
++	if (get_timespec64(&ts, timeout))
++		return -EFAULT;
++	if (!timespec64_valid(&ts))
++		return -EINVAL;
++
++	ms = ts.tv_sec * MSEC_PER_SEC + DIV_ROUND_UP(ts.tv_nsec, NSEC_PER_MSEC);
++	return ms > INT_MAX ? INT_MAX : (int)ms;
++}
++
++SYSCALL_DEFINE6(epoll_pwait2, int, epfd, struct epoll_event __user *, events,
++		int, maxevents, const struct __kernel_timespec __user *, timeout,
++		const sigset_t __user *, sigmask, size_t, sigsetsize)
++{
++	int error, ms;
++
++	ms = epoll_timespec_to_ms(timeout);
++	if (ms < -1)
++		return ms;
++
++	error = set_user_sigmask(sigmask, sigsetsize);
++	if (error)
++		return error;
++
++	error = do_epoll_wait(epfd, events, maxevents, ms);
++	restore_saved_sigmask_unless(error == -EINTR);
++
++	return error;
++}
++
+ #ifdef CONFIG_COMPAT
++COMPAT_SYSCALL_DEFINE6(epoll_pwait2, int, epfd,
++			struct epoll_event __user *, events,
++			int, maxevents,
++			const struct __kernel_timespec __user *, timeout,
++			const compat_sigset_t __user *, sigmask,
++			compat_size_t, sigsetsize)
++{
++	long err;
++	int ms;
++
++	ms = epoll_timespec_to_ms(timeout);
++	if (ms < -1)
++		return ms;
++
++	err = set_compat_user_sigmask(sigmask, sigsetsize);
++	if (err)
++		return err;
++
++	err = do_epoll_wait(epfd, events, maxevents, ms);
++	restore_saved_sigmask_unless(err == -EINTR);
++
++	return err;
++}
++
+ COMPAT_SYSCALL_DEFINE6(epoll_pwait, int, epfd,
+ 			struct epoll_event __user *, events,
+ 			int, maxevents, int, timeout,
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index c4c389c7e..bf64b6a77 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -539,6 +539,12 @@ asmlinkage long compat_sys_epoll_pwait(int epfd,
+ 			int maxevents, int timeout,
+ 			const compat_sigset_t __user *sigmask,
+ 			compat_size_t sigsetsize);
++asmlinkage long compat_sys_epoll_pwait2(int epfd,
++			struct epoll_event __user *events,
++			int maxevents,
++			const struct __kernel_timespec __user *timeout,
++			const compat_sigset_t __user *sigmask,
++			compat_size_t sigsetsize);
+ 
+ /* fs/fcntl.c */
+ asmlinkage long compat_sys_fcntl(unsigned int fd, unsigned int cmd,
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 18523c7b5..facb19ffb 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -364,6 +364,11 @@ asmlinkage long sys_epoll_pwait(int epfd, struct epoll_event __user *events,
+ 				int maxevents, int timeout,
+ 				const sigset_t __user *sigmask,
+ 				size_t sigsetsize);
++asmlinkage long sys_epoll_pwait2(int epfd, struct epoll_event __user *events,
++				 int maxevents,
++				 const struct __kernel_timespec __user *timeout,
++				 const sigset_t __user *sigmask,
++				 size_t sigsetsize);
+ 
+ /* fs/fcntl.c */
+ asmlinkage long sys_dup(unsigned int fildes);
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 674a0b046..0848eb13c 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -852,9 +852,11 @@ __SYSCALL(__NR_clone3, sys_clone3)
+ #endif
+ #define __NR_process_madvise 440
+ __SYSCALL(__NR_process_madvise, sys_process_madvise)
++#define __NR_epoll_pwait2 441
++__SC_COMP(__NR_epoll_pwait2, sys_epoll_pwait2, compat_sys_epoll_pwait2)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 441
++#define __NR_syscalls 442
+ 
+ /*
+  * 32 bit systems traditionally used different
+diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+index 9925446f9..b3ee8641e 100644
+--- a/kernel/sys_ni.c
++++ b/kernel/sys_ni.c
+@@ -68,6 +68,8 @@ COND_SYSCALL(epoll_create1);
+ COND_SYSCALL(epoll_ctl);
+ COND_SYSCALL(epoll_pwait);
+ COND_SYSCALL_COMPAT(epoll_pwait);
++COND_SYSCALL(epoll_pwait2);
++COND_SYSCALL_COMPAT(epoll_pwait2);
+ 
+ /* fs/fcntl.c */
+ 

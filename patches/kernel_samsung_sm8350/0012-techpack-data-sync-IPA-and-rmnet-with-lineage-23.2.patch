@@ -1,0 +1,1955 @@
+From bbf6894d8378d52eb93c82ae4ed78faecea41d86 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 17:35:58 +0000
+Subject: [PATCH 12/12] techpack: data: sync IPA and rmnet with lineage-23.2
+
+---
+ .../dataipa/drivers/platform/msm/gsi/gsi.c    |   4 +-
+ .../platform/msm/ipa/ipa_clients/rndis_ipa.c  |  36 +-
+ .../dataipa/drivers/platform/msm/ipa/ipa_rm.c |   2 +-
+ .../drivers/platform/msm/ipa/ipa_v3/ipa.c     |  39 +-
+ .../platform/msm/ipa/ipa_v3/ipa_debugfs.c     | 144 ++++++-
+ .../drivers/platform/msm/ipa/ipa_v3/ipa_dp.c  | 365 ++++++++++++------
+ .../drivers/platform/msm/ipa/ipa_v3/ipa_i.h   |  50 ++-
+ .../drivers/platform/msm/ipa/ipa_v3/ipa_mpm.c |   2 +-
+ .../drivers/platform/msm/ipa/ipa_v3/ipa_rt.c  |  16 +-
+ .../msm/ipa/ipa_v3/ipahal/ipahal_fltrt_i.h    |   2 +-
+ .../platform/msm/ipa/ipa_v3/rmnet_ipa.c       |  12 +-
+ .../offload/rmnet_offload_main.c              | 161 ++++----
+ techpack/datarmnet/core/Android.mk            |   2 -
+ techpack/datarmnet/core/dfc_qmap.c            |   9 +-
+ techpack/datarmnet/core/rmnet_config.c        |  10 +-
+ techpack/datarmnet/core/rmnet_ctl_client.c    |   9 +-
+ techpack/datarmnet/core/rmnet_descriptor.c    | 176 ++++++++-
+ techpack/datarmnet/core/rmnet_descriptor.h    |   4 +-
+ .../datarmnet/datarmnet_dlkm_vendor_board.mk  |   2 -
+ 19 files changed, 802 insertions(+), 243 deletions(-)
+
+diff --git a/techpack/dataipa/drivers/platform/msm/gsi/gsi.c b/techpack/dataipa/drivers/platform/msm/gsi/gsi.c
+index 55614f00a..2ae33a7bb 100644
+--- a/techpack/dataipa/drivers/platform/msm/gsi/gsi.c
++++ b/techpack/dataipa/drivers/platform/msm/gsi/gsi.c
+@@ -5209,12 +5209,10 @@ static int msm_gsi_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-#ifdef CONFIG_IPC_LOGGING
+ 	gsi_ctx->ipc_logbuf = ipc_log_context_create(GSI_IPC_LOG_PAGES,
+ 		"gsi", 0);
+ 	if (gsi_ctx->ipc_logbuf == NULL)
+-		GSIDBG("failed to create IPC log, continue...\n");
+-#endif
++		GSIERR("failed to create IPC log, continue...\n");
+ 
+ 	gsi_ctx->dev = dev;
+ 	init_completion(&gsi_ctx->gen_ee_cmd_compl);
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c
+index bb7d3c782..06fa55126 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c
+@@ -55,23 +55,22 @@
+ 
+ #define IPA_RNDIS_IPC_LOG_PAGES 50
+ 
+-#ifdef CONFIG_IPC_LOGGING
+-static void *ipa_rndis_logbuf;
+-
+-#define IPA_RNDIS_IPC_LOGGING(fmt, args...) \
++#define IPA_RNDIS_IPC_LOGGING(buf, fmt, args...) \
+ 	do { \
+-		if (ipa_rndis_logbuf) \
+-			ipc_log_string((ipa_rndis_logbuf), fmt, __func__, __LINE__, \
++		if (buf) \
++			ipc_log_string((buf), fmt, __func__, __LINE__, \
+ 				## args); \
+ 	} while (0)
+-#else
+-#define IPA_RNDIS_IPC_LOGGING(fmt, args...)
+-#endif
++
++static void *ipa_rndis_logbuf;
+ 
+ #define RNDIS_IPA_DEBUG(fmt, args...) \
+ 	do { \
+ 		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+-		IPA_RNDIS_IPC_LOGGING(DRV_NAME " %s:%d " fmt, ## args); \
++		if (ipa_rndis_logbuf) { \
++			IPA_RNDIS_IPC_LOGGING(ipa_rndis_logbuf, \
++				DRV_NAME " %s:%d " fmt, ## args); \
++		} \
+ 	} while (0)
+ 
+ #define RNDIS_IPA_DEBUG_XMIT(fmt, args...) \
+@@ -81,14 +80,20 @@ static void *ipa_rndis_logbuf;
+ 	do { \
+ 		pr_err(DRV_NAME "@%s@%d@ctx:%s: "\
+ 			fmt, __func__, __LINE__, current->comm, ## args);\
+-		IPA_RNDIS_IPC_LOGGING(DRV_NAME " %s:%d " fmt, ## args); \
++		if (ipa_rndis_logbuf) { \
++			IPA_RNDIS_IPC_LOGGING(ipa_rndis_logbuf, \
++				DRV_NAME " %s:%d " fmt, ## args); \
++		} \
+ 	} while (0)
+ 
+ #define RNDIS_IPA_ERROR_RL(fmt, args...) \
+ 	do { \
+ 		pr_err_ratelimited_ipa(DRV_NAME "@%s@%d@ctx:%s: "\
+ 			fmt, __func__, __LINE__, current->comm, ## args);\
+-		IPA_RNDIS_IPC_LOGGING(DRV_NAME " %s:%d " fmt, ## args); \
++		if (ipa_rndis_logbuf) { \
++			IPA_RNDIS_IPC_LOGGING(ipa_rndis_logbuf, \
++				DRV_NAME " %s:%d " fmt, ## args); \
++		} \
+ 	} while (0)
+ 
+ #define NULL_CHECK_RETVAL(ptr) \
+@@ -1451,7 +1456,7 @@ static void rndis_ipa_xmit_error(struct sk_buff *skb)
+ 	delay_jiffies = msecs_to_jiffies(
+ 		rndis_ipa_ctx->error_msec_sleep_time + rand_dealy_msec);
+ 
+-	retval = queue_delayed_work(system_power_efficient_wq,
++	retval = schedule_delayed_work(
+ 		&rndis_ipa_ctx->xmit_error_delayed_work, delay_jiffies);
+ 	if (!retval) {
+ 		RNDIS_IPA_ERROR("fail to schedule delayed work\n");
+@@ -2437,12 +2442,10 @@ static ssize_t rndis_ipa_debugfs_atomic_read
+ 
+ static int __init rndis_ipa_init_module(void)
+ {
+-#ifdef CONFIG_IPC_LOGGING
+ 	ipa_rndis_logbuf = ipc_log_context_create(IPA_RNDIS_IPC_LOG_PAGES,
+ 		"ipa_rndis", 0);
+ 	if (ipa_rndis_logbuf == NULL)
+ 		RNDIS_IPA_ERROR("failed to create IPC log, continue...\n");
+-#endif
+ 
+ 	pr_info("RNDIS_IPA module is loaded.\n");
+ 	return 0;
+@@ -2450,11 +2453,10 @@ static int __init rndis_ipa_init_module(void)
+ 
+ static void __exit rndis_ipa_cleanup_module(void)
+ {
+-#ifdef CONFIG_IPC_LOGGING
+ 	if (ipa_rndis_logbuf)
+ 		ipc_log_context_destroy(ipa_rndis_logbuf);
+ 	ipa_rndis_logbuf = NULL;
+-#endif
++
+ 	pr_info("RNDIS_IPA module is unloaded.\n");
+ }
+ 
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_rm.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_rm.c
+index a0088ee54..1fdb23d7e 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_rm.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_rm.c
+@@ -294,7 +294,7 @@ int ipa_rm_request_resource_with_timer(enum ipa_rm_resource_name resource_name)
+ 	release_work->needed_bw = 0;
+ 	release_work->dec_usage_count = false;
+ 	INIT_DELAYED_WORK(&release_work->work, delayed_release_work_func);
+-	queue_delayed_work(system_power_efficient_wq, &release_work->work,
++	schedule_delayed_work(&release_work->work,
+ 			msecs_to_jiffies(IPA_RM_RELEASE_DELAY_IN_MSEC));
+ 	result = 0;
+ bail:
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c
+index 26bc9f538..97a97e56f 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa.c
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #include <linux/clk.h>
+@@ -2035,7 +2035,7 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ {
+ 	int retval = 0;
+ 	u32 pyld_sz;
+-	u8 header[128] = { 0 };
++	u8 header[512] = { 0 };
+ 	u8 *param = NULL;
+ 	bool is_vlan_mode;
+ 	struct ipa_ioc_nat_alloc_mem nat_mem;
+@@ -5383,6 +5383,7 @@ void ipa3_enable_clks(void)
+ 
+ 	idx = ipa3_get_bus_vote();
+ 
++	IPADBG_CLK("IPA ICC Voting for BW Started\n");
+ 	for (i = 0; i < ipa3_ctx->icc_num_paths; i++) {
+ 		if (ipa3_ctx->ctrl->icc_path[i] &&
+ 			icc_set_bw(
+@@ -5390,8 +5391,13 @@ void ipa3_enable_clks(void)
+ 			ipa3_ctx->icc_clk[idx][i][IPA_ICC_AB],
+ 			ipa3_ctx->icc_clk[idx][i][IPA_ICC_IB]))
+ 			WARN(1, "path %d bus scaling failed", i);
++			IPADBG_CLK("IPA ICC Voting for BW %d Path Completed\n", i);
+ 	}
++	IPADBG_CLK("IPA ICC Voting for BW Finished\n");
++
++	IPADBG_CLK("Enabling IPA Clocks Started\n");
+ 	ipa3_ctx->ctrl->ipa3_enable_clks();
++	IPADBG_CLK("Enabling IPA Clocks Finished\n");
+ 	atomic_set(&ipa3_ctx->ipa_clk_vote, 1);
+ }
+ 
+@@ -5443,10 +5449,13 @@ void ipa3_disable_clks(void)
+ 		ipa_assert();
+ 	}
+ 
++	IPADBG_CLK("Disabling IPA Clocks Started\n");
+ 	ipa3_ctx->ctrl->ipa3_disable_clks();
++	IPADBG_CLK("Disabling IPA Clocks Finished\n");
+ 
+ 	ipa_pm_set_clock_index(0);
+ 
++	IPADBG_CLK("IPA ICC Voting for BW Started\n");
+ 	for (i = 0; i < ipa3_ctx->icc_num_paths; i++) {
+ 		if (ipa3_ctx->ctrl->icc_path[i] &&
+ 			icc_set_bw(
+@@ -5454,7 +5463,9 @@ void ipa3_disable_clks(void)
+ 			ipa3_ctx->icc_clk[IPA_ICC_NONE][i][IPA_ICC_AB],
+ 			ipa3_ctx->icc_clk[IPA_ICC_NONE][i][IPA_ICC_IB]))
+ 			WARN(1, "path %d bus off failed", i);
++			IPADBG_CLK("IPA ICC Voting for BW %d Path Completed\n", i);
+ 	}
++	IPADBG_CLK("IPA ICC Voting for BW Finished\n");
+ 	atomic_set(&ipa3_ctx->ipa_clk_vote, 0);
+ }
+ 
+@@ -7319,6 +7330,10 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
+ 	if (ipa3_ctx->logbuf == NULL)
+ 		IPADBG("failed to create IPC log, continue...\n");
+ 
++	ipa3_ctx->logbuf_clk = ipc_log_context_create(IPA_IPC_LOG_PAGES, "ipa_clk", 0);
++	if (ipa3_ctx->logbuf_clk == NULL)
++		IPADBG("failed to create IPC ipa_clk log, continue...\n");
++
+ 	/* ipa3_ctx->pdev and ipa3_ctx->uc_pdev will be set in the smmu probes*/
+ 	ipa3_ctx->master_pdev = ipa_pdev;
+ 	for (i = 0; i < IPA_SMMU_CB_MAX; i++)
+@@ -7364,6 +7379,13 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
+ 	ipa3_ctx->stats.page_recycle_stats[0].tmp_alloc = 0;
+ 	ipa3_ctx->stats.page_recycle_stats[1].total_replenished = 0;
+ 	ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc = 0;
++	memset(ipa3_ctx->stats.page_recycle_cnt, 0,
++		sizeof(ipa3_ctx->stats.page_recycle_cnt));
++	ipa3_ctx->stats.num_sort_tasklet_sched[0] = 0;
++	ipa3_ctx->stats.num_sort_tasklet_sched[1] = 0;
++	ipa3_ctx->stats.num_sort_tasklet_sched[2] = 0;
++	ipa3_ctx->stats.num_of_times_wq_reschd = 0;
++	ipa3_ctx->stats.page_recycle_cnt_in_tasklet = 0;
+ 	ipa3_ctx->skip_uc_pipe_reset = resource_p->skip_uc_pipe_reset;
+ 	ipa3_ctx->tethered_flow_control = resource_p->tethered_flow_control;
+ 	ipa3_ctx->ee = resource_p->ee;
+@@ -7554,6 +7576,17 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
+ 	/* Enable ipa3_ctx->enable_napi_chain */
+ 	ipa3_ctx->enable_napi_chain = 1;
+ 
++	/* Initialize Page poll threshold. */
++	ipa3_ctx->page_poll_threshold = IPA_PAGE_POLL_DEFAULT_THRESHOLD;
++
++	/*Initialize number napi without prealloc buff*/
++	ipa3_ctx->ipa_max_napi_sort_page_thrshld = IPA_MAX_NAPI_SORT_PAGE_THRSHLD;
++	ipa3_ctx->page_wq_reschd_time = IPA_MAX_PAGE_WQ_RESCHED_TIME;
++
++	/* Use common page pool for Def/Coal pipe. */
++	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_9)
++		ipa3_ctx->wan_common_page_pool = true;
++
+ 	/* assume clock is on in virtual/emulation mode */
+ 	if (ipa3_ctx->ipa3_hw_mode == IPA_HW_MODE_VIRTUAL ||
+ 	    ipa3_ctx->ipa3_hw_mode == IPA_HW_MODE_EMULATION)
+@@ -8192,7 +8225,7 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
+ 	ipa_drv_res->ipa_mhi_dynamic_config = false;
+ 	ipa_drv_res->use_64_bit_dma_mask = false;
+ 	ipa_drv_res->use_bw_vote = false;
+-	ipa_drv_res->wan_rx_ring_size = IPA_GENERIC_RX_POOL_SZ;
++	ipa_drv_res->wan_rx_ring_size = IPA_GENERIC_RX_POOL_SZ_WAN;
+ 	ipa_drv_res->lan_rx_ring_size = IPA_GENERIC_RX_POOL_SZ;
+ 	ipa_drv_res->apply_rg10_wa = false;
+ 	ipa_drv_res->gsi_ch20_wa = false;
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_debugfs.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_debugfs.c
+index a83c50716..426cbbea0 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_debugfs.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_debugfs.c
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #ifdef CONFIG_DEBUG_FS
+@@ -1353,6 +1353,7 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
+ 		"act_clnt=%u\n"
+ 		"con_clnt_bmap=0x%x\n"
+ 		"wan_rx_empty=%u\n"
++		"wan_rx_empty_coal=%u\n"
+ 		"wan_repl_rx_empty=%u\n"
+ 		"lan_rx_empty=%u\n"
+ 		"lan_repl_rx_empty=%u\n"
+@@ -1372,6 +1373,7 @@ static ssize_t ipa3_read_stats(struct file *file, char __user *ubuf,
+ 		atomic_read(&ipa3_ctx->ipa3_active_clients.cnt),
+ 		connect,
+ 		ipa3_ctx->stats.wan_rx_empty,
++		ipa3_ctx->stats.wan_rx_empty_coal,
+ 		ipa3_ctx->stats.wan_repl_rx_empty,
+ 		ipa3_ctx->stats.lan_rx_empty,
+ 		ipa3_ctx->stats.lan_repl_rx_empty,
+@@ -1421,24 +1423,46 @@ static ssize_t ipa3_read_odlstats(struct file *file, char __user *ubuf,
+ 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
+ }
+ 
++
+ static ssize_t ipa3_read_page_recycle_stats(struct file *file,
+ 		char __user *ubuf, size_t count, loff_t *ppos)
+ {
+ 	int nbytes;
+-	int cnt = 0;
++	int cnt = 0, i = 0, k = 0;
+ 
+ 	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
+ 			"COAL : Total number of packets replenished =%llu\n"
++			"COAL : Number of page recycled packets  =%llu\n"
+ 			"COAL : Number of tmp alloc packets  =%llu\n"
++			"COAL  : Number of times tasklet scheduled  =%llu\n"
+ 			"DEF  : Total number of packets replenished =%llu\n"
+-			"DEF  : Number of tmp alloc packets  =%llu\n",
++			"DEF  : Number of page recycled packets =%llu\n"
++			"DEF  : Number of tmp alloc packets  =%llu\n"
++			"DEF  : Number of times tasklet scheduled  =%llu\n"
++			"COMMON  : Number of page recycled in tasklet  =%llu\n"
++			"COMMON  : Number of times free pages not found in tasklet =%llu\n",
+ 			ipa3_ctx->stats.page_recycle_stats[0].total_replenished,
++			ipa3_ctx->stats.page_recycle_stats[0].page_recycled,
+ 			ipa3_ctx->stats.page_recycle_stats[0].tmp_alloc,
++			ipa3_ctx->stats.num_sort_tasklet_sched[0],
+ 			ipa3_ctx->stats.page_recycle_stats[1].total_replenished,
+-			ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc);
++			ipa3_ctx->stats.page_recycle_stats[1].page_recycled,
++			ipa3_ctx->stats.page_recycle_stats[1].tmp_alloc,
++			ipa3_ctx->stats.num_sort_tasklet_sched[1],
++			ipa3_ctx->stats.page_recycle_cnt_in_tasklet,
++			ipa3_ctx->stats.num_of_times_wq_reschd);
+ 
+ 	cnt += nbytes;
+ 
++	for (k = 0; k < 2; k++) {
++		for (i = 0; i < ipa3_ctx->page_poll_threshold; i++) {
++			nbytes = scnprintf(dbg_buff + cnt, IPA_MAX_MSG_LEN,
++				"COMMON  : Page replenish efficiency[%d][%d]  =%llu\n",
++				k, i, ipa3_ctx->stats.page_recycle_cnt[k][i]);
++			cnt += nbytes;
++		}
++	}
++
+ 	return simple_read_from_buffer(ubuf, count, ppos, dbg_buff, cnt);
+ }
+ static ssize_t ipa3_read_wstats(struct file *file, char __user *ubuf,
+@@ -2772,6 +2796,68 @@ static ssize_t ipa3_enable_ipc_low(struct file *file,
+ 	return count;
+ }
+ 
++static ssize_t ipa3_read_ipa_max_napi_sort_page_thrshld(struct file *file,
++	char __user *buf, size_t count, loff_t *ppos) {
++
++	int nbytes;
++	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
++				"page max napi without free page = %d\n",
++				ipa3_ctx->ipa_max_napi_sort_page_thrshld);
++	return simple_read_from_buffer(buf, count, ppos, dbg_buff, nbytes);
++
++}
++
++static ssize_t ipa3_write_ipa_max_napi_sort_page_thrshld(struct file *file,
++	const char __user *buf, size_t count, loff_t *ppos) {
++
++	int ret;
++	u8 ipa_max_napi_sort_page_thrshld = 0;
++
++	if (count >= sizeof(dbg_buff))
++		return -EFAULT;
++
++	ret = kstrtou8_from_user(buf, count, 0, &ipa_max_napi_sort_page_thrshld);
++	if(ret)
++		return ret;
++
++	ipa3_ctx->ipa_max_napi_sort_page_thrshld = ipa_max_napi_sort_page_thrshld;
++
++	IPADBG("napi cnt without prealloc pages = %d", ipa3_ctx->ipa_max_napi_sort_page_thrshld);
++
++	return count;
++}
++
++static ssize_t ipa3_read_page_wq_reschd_time(struct file *file,
++	char __user *buf, size_t count, loff_t *ppos) {
++
++	int nbytes;
++	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
++				"Page WQ reschduule time = %d\n",
++				ipa3_ctx->page_wq_reschd_time);
++	return simple_read_from_buffer(buf, count, ppos, dbg_buff, nbytes);
++
++}
++
++static ssize_t ipa3_write_page_wq_reschd_time(struct file *file,
++	const char __user *buf, size_t count, loff_t *ppos) {
++
++	int ret;
++	u8 page_wq_reschd_time = 0;
++
++	if (count >= sizeof(dbg_buff))
++		return -EFAULT;
++
++	ret = kstrtou8_from_user(buf, count, 0, &page_wq_reschd_time);
++	if(ret)
++		return ret;
++
++	ipa3_ctx->page_wq_reschd_time = page_wq_reschd_time;
++
++	IPADBG("Updated page WQ reschedule time = %d", ipa3_ctx->page_wq_reschd_time);
++
++	return count;
++}
++
+ static ssize_t ipa3_read_gsi_wdi3_db_polling(struct file *file,
+ 	char __user *buf, size_t count, loff_t *ppos) {
+ 
+@@ -2804,6 +2890,41 @@ static ssize_t ipa3_write_gsi_wdi3_db_polling(struct file *file,
+ 	return count;
+ }
+ 
++static ssize_t ipa3_read_page_poll_threshold(struct file *file,
++		char __user *buf, size_t count, loff_t *ppos) {
++
++	int nbytes;
++	nbytes = scnprintf(dbg_buff, IPA_MAX_MSG_LEN,
++				"Page Poll Threshold = %d\n",
++				ipa3_ctx->page_poll_threshold);
++	return simple_read_from_buffer(buf, count, ppos, dbg_buff, nbytes);
++
++}
++
++static ssize_t ipa3_write_page_poll_threshold(struct file *file,
++	const char __user *buf, size_t count, loff_t *ppos) {
++
++	int ret;
++	u8 page_poll_threshold =0;
++
++	if (count >= sizeof(dbg_buff))
++		return -EFAULT;
++
++	ret = kstrtou8_from_user(buf, count, 0, &page_poll_threshold);
++	if(ret)
++		return ret;
++
++	if(page_poll_threshold != 0 &&
++		page_poll_threshold <= IPA_PAGE_POLL_THRESHOLD_MAX)
++		ipa3_ctx->page_poll_threshold = page_poll_threshold;
++	else
++		IPAERR("Invalid value \n");
++
++	IPADBG("Updated page poll threshold = %d", ipa3_ctx->page_poll_threshold);
++
++	return count;
++}
++
+ static const struct ipa3_debugfs_file debugfs_files[] = {
+ 	{
+ 		"gen_reg", IPA_READ_ONLY_MODE, NULL, {
+@@ -2986,6 +3107,21 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
+ 			.read = ipa3_read_gsi_wdi3_db_polling,
+ 			.write = ipa3_write_gsi_wdi3_db_polling,
+ 		}
++	}, {
++		"page_poll_threshold", IPA_READ_WRITE_MODE, NULL, {
++			.read = ipa3_read_page_poll_threshold,
++			.write = ipa3_write_page_poll_threshold,
++		}
++	}, {
++		"page_wq_reschd_time", IPA_READ_WRITE_MODE, NULL, {
++			.read = ipa3_read_page_wq_reschd_time,
++			.write = ipa3_write_page_wq_reschd_time,
++		}
++	}, {
++		"ipa_max_napi_sort_page_thrshld", IPA_READ_WRITE_MODE, NULL, {
++			.read = ipa3_read_ipa_max_napi_sort_page_thrshld,
++			.write = ipa3_write_ipa_max_napi_sort_page_thrshld,
++		}
+ 	},
+ };
+ 
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+index 3b9834699..7fdd8ac79 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #include <linux/delay.h>
+@@ -137,6 +137,7 @@ static int ipa_poll_gsi_n_pkt(struct ipa3_sys_context *sys,
+ static unsigned long tag_to_pointer_wa(uint64_t tag);
+ static uint64_t pointer_to_tag_wa(struct ipa3_tx_pkt_wrapper *tx_pkt);
+ static void ipa3_tasklet_rx_notify(unsigned long data);
++static void ipa3_tasklet_find_freepage(unsigned long data);
+ 
+ static u32 ipa_adjust_ra_buff_base_sz(u32 aggr_byte_limit);
+ 
+@@ -1048,6 +1049,62 @@ static void ipa_pm_sys_pipe_cb(void *p, enum ipa_pm_cb_event event)
+ 	}
+ }
+ 
++static void ipa3_schd_freepage_work(struct work_struct *work)
++{
++	struct delayed_work *dwork;
++	struct ipa3_sys_context *sys;
++
++	dwork = container_of(work, struct delayed_work, work);
++	sys = container_of(dwork, struct ipa3_sys_context, freepage_work);
++
++	IPADBG_LOW("WQ scheduled, reschedule sort tasklet\n");
++
++	tasklet_schedule(&sys->tasklet_find_freepage);
++}
++
++static void ipa3_tasklet_find_freepage(unsigned long data)
++{
++	struct ipa3_sys_context *sys;
++	struct ipa3_rx_pkt_wrapper *rx_pkt = NULL;
++	struct ipa3_rx_pkt_wrapper *tmp = NULL;
++	struct page *cur_page;
++	int found_free_page = 0;
++	struct list_head temp_head;
++
++	sys = (struct ipa3_sys_context *)data;
++
++	if(sys->page_recycle_repl == NULL)
++		return;
++	INIT_LIST_HEAD(&temp_head);
++	spin_lock_bh(&sys->common_sys->spinlock);
++	list_for_each_entry_safe(rx_pkt, tmp,
++		&sys->page_recycle_repl->page_repl_head, link) {
++		cur_page = rx_pkt->page_data.page;
++		if (page_ref_count(cur_page) == 1) {
++			/* Found a free page. */
++			list_del_init(&rx_pkt->link);
++			list_add(&rx_pkt->link, &temp_head);
++			found_free_page++;
++		}
++	}
++	if (!found_free_page) {
++		/*Not found free page rescheduling tasklet after 2msec*/
++		IPADBG_LOW("Scheduling WQ not found free pages\n");
++		++ipa3_ctx->stats.num_of_times_wq_reschd;
++		queue_delayed_work(sys->freepage_wq,
++				&sys->freepage_work,
++				msecs_to_jiffies(ipa3_ctx->page_wq_reschd_time));
++	} else {
++		/*Allow to use pre-allocated buffers*/
++		list_splice(&temp_head, &sys->page_recycle_repl->page_repl_head);
++		ipa3_ctx->stats.page_recycle_cnt_in_tasklet += found_free_page;
++		IPADBG_LOW("found free pages count = %d\n", found_free_page);
++		atomic_set(&sys->common_sys->page_avilable, 1);
++	}
++	spin_unlock_bh(&sys->common_sys->spinlock);
++
++}
++
+ /**
+  * ipa3_setup_sys_pipe() - Setup an IPA GPI pipe and perform
+  * IPA EP configuration
+@@ -1130,7 +1187,8 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ 		snprintf(buff, IPA_RESOURCE_NAME_MAX, "iparepwq%d",
+ 				sys_in->client);
+ 		ep->sys->repl_wq = alloc_workqueue(buff,
+-				WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS, 1);
++				WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI,
++				1);
+ 		if (!ep->sys->repl_wq) {
+ 			IPAERR("failed to create rep wq for client %d\n",
+ 					sys_in->client);
+@@ -1138,6 +1196,9 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ 			goto fail_wq2;
+ 		}
+ 
++		snprintf(buff, IPA_RESOURCE_NAME_MAX, "ipafreepagewq%d",
++				sys_in->client);
++
+ 		INIT_LIST_HEAD(&ep->sys->head_desc_list);
+ 		INIT_LIST_HEAD(&ep->sys->rcycl_list);
+ 		INIT_LIST_HEAD(&ep->sys->avail_tx_wrapper_list);
+@@ -1154,6 +1215,16 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ 			/* Use coalescing pipe PM handle for default pipe also*/
+ 			ep->sys->pm_hdl = ipa3_ctx->ep[coal_ep_id].sys->pm_hdl;
+ 		} else if (IPA_CLIENT_IS_CONS(sys_in->client)) {
++			ep->sys->freepage_wq = alloc_workqueue(buff,
++					WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS |
++					WQ_HIGHPRI, 1);
++			if (!ep->sys->freepage_wq) {
++				IPAERR("failed to create freepage wq for client %d\n",
++						sys_in->client);
++				result = -EFAULT;
++				goto fail_wq3;
++			}
++
+ 			pm_reg.name = ipa_clients_strings[sys_in->client];
+ 			pm_reg.callback = ipa_pm_sys_pipe_cb;
+ 			pm_reg.user_data = ep->sys;
+@@ -1254,6 +1325,7 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ 	}
+ 
+ 	*clnt_hdl = ipa_ep_idx;
++	ep->sys->common_sys = ipa3_ctx->ep[ipa_ep_idx].sys;
+ 
+ 	if (ep->sys->repl_hdlr == ipa3_fast_replenish_rx_cache) {
+ 		ep->sys->repl = kzalloc(sizeof(*ep->sys->repl), GFP_KERNEL);
+@@ -1279,41 +1351,77 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ 		}
+ 	}
+ 
++	/* Use common page pool for Coal and defalt pipe if applicable. */
+ 	if (ep->sys->repl_hdlr == ipa3_replenish_rx_page_recycle) {
+-		ep->sys->page_recycle_repl = kzalloc(
+-			sizeof(*ep->sys->page_recycle_repl), GFP_KERNEL);
+-		if (!ep->sys->page_recycle_repl) {
+-			IPAERR("failed to alloc repl for client %d\n",
+-					sys_in->client);
+-			result = -ENOMEM;
+-			goto fail_napi;
+-		}
+-		atomic_set(&ep->sys->page_recycle_repl->pending, 0);
+-		ep->sys->page_recycle_repl->capacity =
+-				(ep->sys->rx_pool_sz + 1) * 2;
+-
+-		ep->sys->page_recycle_repl->cache =
+-				kcalloc(ep->sys->page_recycle_repl->capacity,
+-				sizeof(void *), GFP_KERNEL);
+-		atomic_set(&ep->sys->page_recycle_repl->head_idx, 0);
+-		atomic_set(&ep->sys->page_recycle_repl->tail_idx, 0);
+-		ep->sys->repl = kzalloc(sizeof(*ep->sys->repl), GFP_KERNEL);
+-		if (!ep->sys->repl) {
+-			IPAERR("failed to alloc repl for client %d\n",
+-				   sys_in->client);
+-			result = -ENOMEM;
+-			goto fail_page_recycle_repl;
+-		}
+-		ep->sys->repl->capacity = (ep->sys->rx_pool_sz + 1);
++		if (!(ipa3_ctx->wan_common_page_pool &&
++			sys_in->client == IPA_CLIENT_APPS_WAN_CONS &&
++			coal_ep_id != IPA_EP_NOT_ALLOCATED &&
++			ipa3_ctx->ep[coal_ep_id].valid == 1)) {
++			/* Allocate page recycling pool only once. */
++			if (!ep->sys->page_recycle_repl) {
++				ep->sys->page_recycle_repl = kzalloc(
++					sizeof(*ep->sys->page_recycle_repl), GFP_KERNEL);
++				if (!ep->sys->page_recycle_repl) {
++					IPAERR("failed to alloc repl for client %d\n",
++							sys_in->client);
++					result = -ENOMEM;
++					goto fail_napi;
++				}
++				atomic_set(&ep->sys->page_recycle_repl->pending, 0);
++				/* For common page pool double the pool size. */
++				if (ipa3_ctx->wan_common_page_pool &&
++					sys_in->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
++					ep->sys->page_recycle_repl->capacity =
++							(ep->sys->rx_pool_sz + 1) *
++							IPA_GENERIC_RX_CMN_PAGE_POOL_SZ_FACTOR;
++				else
++					ep->sys->page_recycle_repl->capacity =
++							(ep->sys->rx_pool_sz + 1) *
++							IPA_GENERIC_RX_PAGE_POOL_SZ_FACTOR;
++				IPADBG("Page repl capacity for client:%d, value:%d\n",
++						   sys_in->client, ep->sys->page_recycle_repl->capacity);
++				INIT_LIST_HEAD(&ep->sys->page_recycle_repl->page_repl_head);
++				INIT_DELAYED_WORK(&ep->sys->freepage_work, ipa3_schd_freepage_work);
++				tasklet_init(&ep->sys->tasklet_find_freepage,
++					ipa3_tasklet_find_freepage, (unsigned long) ep->sys);
++				ipa3_replenish_rx_page_cache(ep->sys);
++			} else {
++ 				ep->sys->napi_sort_page_thrshld_cnt = 0;
++				/* Sort the pages once. */
++				ipa3_tasklet_find_freepage((unsigned long) ep->sys);
++			}
+ 
+-		atomic_set(&ep->sys->repl->pending, 0);
+-		ep->sys->repl->cache = kcalloc(ep->sys->repl->capacity,
+-				sizeof(void *), GFP_KERNEL);
+-		atomic_set(&ep->sys->repl->head_idx, 0);
+-		atomic_set(&ep->sys->repl->tail_idx, 0);
++			ep->sys->repl = kzalloc(sizeof(*ep->sys->repl), GFP_KERNEL);
++			if (!ep->sys->repl) {
++				IPAERR("failed to alloc repl for client %d\n",
++					   sys_in->client);
++				result = -ENOMEM;
++				goto fail_page_recycle_repl;
++			}
++			/* For common page pool triple the pool size. */
++			if (ipa3_ctx->wan_common_page_pool &&
++				sys_in->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
++				ep->sys->repl->capacity = (ep->sys->rx_pool_sz + 1) *
++				IPA_GENERIC_RX_CMN_TEMP_POOL_SZ_FACTOR;
++			else
++				ep->sys->repl->capacity = (ep->sys->rx_pool_sz + 1);
++			IPADBG("Repl capacity for client:%d, value:%d\n",
++					   sys_in->client, ep->sys->repl->capacity);
++			atomic_set(&ep->sys->repl->pending, 0);
++			ep->sys->repl->cache = kcalloc(ep->sys->repl->capacity,
++					sizeof(void *), GFP_KERNEL);
++			atomic_set(&ep->sys->repl->head_idx, 0);
++			atomic_set(&ep->sys->repl->tail_idx, 0);
+ 
+-		ipa3_replenish_rx_page_cache(ep->sys);
+-		ipa3_wq_page_repl(&ep->sys->repl_work);
++			ipa3_wq_page_repl(&ep->sys->repl_work);
++		} else {
++			/* Use pool same as coal pipe when common page pool is used */
++			ep->sys->common_buff_pool = true;
++			ep->sys->common_sys = ipa3_ctx->ep[coal_ep_id].sys;
++			ep->sys->repl = ipa3_ctx->ep[coal_ep_id].sys->repl;
++			ep->sys->page_recycle_repl =
++				ipa3_ctx->ep[coal_ep_id].sys->page_recycle_repl;
++		}
+ 	}
+ 
+ 	if (IPA_CLIENT_IS_CONS(sys_in->client)) {
+@@ -1383,16 +1491,16 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ fail_gen3:
+ 	ipa3_disable_data_path(ipa_ep_idx);
+ fail_repl:
+-	if (IPA_CLIENT_IS_CONS(ep->client))
++	if (IPA_CLIENT_IS_CONS(ep->client) && !ep->sys->common_buff_pool)
+ 		ipa3_cleanup_rx(ep->sys);
+ 
+-	if(ep->sys->repl) {
++	ep->sys->repl_hdlr = ipa3_replenish_rx_cache;
++	if (ep->sys->repl && !ep->sys->common_buff_pool) {
+ 		ep->sys->repl->capacity = 0;
+ 		kfree(ep->sys->repl);
+-		ep->sys->repl = NULL;
+ 	}
+ fail_page_recycle_repl:
+-	if (ep->sys->page_recycle_repl) {
++	if (ep->sys->page_recycle_repl && !ep->sys->common_buff_pool) {
+ 		ep->sys->page_recycle_repl->capacity = 0;
+ 		kfree(ep->sys->page_recycle_repl);
+ 		ep->sys->page_recycle_repl = NULL;
+@@ -1405,6 +1513,9 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
+ fail_gen2:
+ 	ipa_pm_deregister(ep->sys->pm_hdl);
+ fail_pm:
++	if (ep->sys->freepage_wq)
++		destroy_workqueue(ep->sys->freepage_wq);
++fail_wq3:
+ 	destroy_workqueue(ep->sys->repl_wq);
+ fail_wq2:
+ 	destroy_workqueue(ep->sys->wq);
+@@ -1572,7 +1683,13 @@ int ipa3_teardown_sys_pipe(u32 clnt_hdl)
+ 	}
+ 	if (ep->sys->repl_wq)
+ 		flush_workqueue(ep->sys->repl_wq);
+-	if (IPA_CLIENT_IS_CONS(ep->client))
++
++	if (ep->sys->repl_hdlr == ipa3_replenish_rx_page_recycle) {
++		cancel_delayed_work_sync(&ep->sys->common_sys->freepage_work);
++		tasklet_kill(&ep->sys->common_sys->tasklet_find_freepage);
++	}
++
++	if (IPA_CLIENT_IS_CONS(ep->client) && !ep->sys->common_buff_pool)
+ 		ipa3_cleanup_rx(ep->sys);
+ 
+ 	if (!ep->skip_ep_cfg && IPA_CLIENT_IS_PROD(ep->client)) {
+@@ -1658,7 +1775,7 @@ static int ipa3_teardown_coal_def_pipe(u32 clnt_hdl)
+ 
+ 	if (ep->sys->repl_wq)
+ 		flush_workqueue(ep->sys->repl_wq);
+-	if (IPA_CLIENT_IS_CONS(ep->client))
++	if (IPA_CLIENT_IS_CONS(ep->client) && !ep->sys->common_buff_pool)
+ 		ipa3_cleanup_rx(ep->sys);
+ 
+ 	ep->valid = 0;
+@@ -2082,6 +2199,9 @@ static struct ipa3_rx_pkt_wrapper *ipa3_alloc_rx_pkt_page(
+ 		return NULL;
+ 
+ 	rx_pkt->page_data.page_order = IPA_WAN_PAGE_ORDER;
++	/* For temporary allocations, avoid triggering OOM Killer. */
++	if (is_tmp_alloc)
++		flag |= __GFP_RETRY_MAYFAIL | __GFP_NOWARN;
+ 	/* Try a lower order page for order 3 pages in case allocation fails. */
+ 	rx_pkt->page_data.page = ipa3_alloc_page(flag,
+ 				&rx_pkt->page_data.page_order,
+@@ -2127,9 +2247,12 @@ static void ipa3_replenish_rx_page_cache(struct ipa3_sys_context *sys)
+ 			ipa_assert();
+ 			break;
+ 		}
++		INIT_LIST_HEAD(&rx_pkt->link);
+ 		rx_pkt->sys = sys;
+-		sys->page_recycle_repl->cache[curr] = rx_pkt;
++		list_add_tail(&rx_pkt->link,
++			&sys->page_recycle_repl->page_repl_head);
+ 	}
++	atomic_set(&sys->common_sys->page_avilable, 1);
+ 
+ 	return;
+ 
+@@ -2190,12 +2313,54 @@ static inline void __trigger_repl_work(struct ipa3_sys_context *sys)
+ 	head = atomic_read(&sys->repl->head_idx);
+ 	avail = (tail - head) % sys->repl->capacity;
+ 
+-	if (avail < sys->repl->capacity / 4) {
++	if (avail < sys->repl->capacity / 2) {
+ 		atomic_set(&sys->repl->pending, 1);
+ 		queue_work(sys->repl_wq, &sys->repl_work);
+ 	}
+ }
+ 
++static struct ipa3_rx_pkt_wrapper * ipa3_get_free_page
++(
++	struct ipa3_sys_context *sys,
++	u32 stats_i
++)
++{
++	struct ipa3_rx_pkt_wrapper *rx_pkt = NULL;
++	struct ipa3_rx_pkt_wrapper *tmp = NULL;
++	struct page *cur_page;
++	int i = 0;
++	u8 LOOP_THRESHOLD = ipa3_ctx->page_poll_threshold;
++
++	spin_lock_bh(&sys->common_sys->spinlock);
++	list_for_each_entry_safe(rx_pkt, tmp,
++		&sys->page_recycle_repl->page_repl_head, link) {
++		if (i == LOOP_THRESHOLD)
++			break;
++		cur_page = rx_pkt->page_data.page;
++		if (page_ref_count(cur_page) == 1) {
++			/* Found a free page. */
++			page_ref_inc(cur_page);
++			list_del_init(&rx_pkt->link);
++			++ipa3_ctx->stats.page_recycle_cnt[stats_i][i];
++			sys->common_sys->napi_sort_page_thrshld_cnt = 0;
++			spin_unlock_bh(&sys->common_sys->spinlock);
++			return rx_pkt;
++		}
++		i++;
++	}
++	spin_unlock_bh(&sys->common_sys->spinlock);
++	IPADBG_LOW("napi_sort_page_thrshld_cnt = %d ipa_max_napi_sort_page_thrshld = %d\n",
++			sys->common_sys->napi_sort_page_thrshld_cnt,
++			ipa3_ctx->ipa_max_napi_sort_page_thrshld);
++	/*Scheduling tasklet to find the free page*/
++	if (sys->common_sys->napi_sort_page_thrshld_cnt >=
++			ipa3_ctx->ipa_max_napi_sort_page_thrshld) {
++		atomic_set(&sys->common_sys->page_avilable, 0);
++		tasklet_schedule(&sys->common_sys->tasklet_find_freepage);
++		++ipa3_ctx->stats.num_sort_tasklet_sched[stats_i];
++	}
++	return NULL;
++}
+ 
+ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ {
+@@ -2203,10 +2368,8 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ 	int ret;
+ 	int rx_len_cached = 0;
+ 	struct gsi_xfer_elem gsi_xfer_elem_array[IPA_REPL_XFER_MAX];
+-	u32 curr;
+ 	u32 curr_wq;
+ 	int idx = 0;
+-	struct page *cur_page;
+ 	u32 stats_i = 0;
+ 
+ 	/* start replenish only when buffers go lower than the threshold */
+@@ -2214,19 +2377,15 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ 		return;
+ 	stats_i = (sys->ep->client == IPA_CLIENT_APPS_WAN_COAL_CONS) ? 0 : 1;
+ 
+-	spin_lock_bh(&sys->spinlock);
+ 	rx_len_cached = sys->len;
+-	curr = atomic_read(&sys->page_recycle_repl->head_idx);
+ 	curr_wq = atomic_read(&sys->repl->head_idx);
+ 
+ 	while (rx_len_cached < sys->rx_pool_sz) {
+-		cur_page = sys->page_recycle_repl->cache[curr]->page_data.page;
+-		/* Found an idle page that can be used */
+-		if (page_ref_count(cur_page) == 1) {
+-			page_ref_inc(cur_page);
+-			rx_pkt = sys->page_recycle_repl->cache[curr];
+-			curr = (++curr == sys->page_recycle_repl->capacity) ?
+-								0 : curr;
++		/* check for an idle page that can be used */
++		if (atomic_read(&sys->common_sys->page_avilable) &&
++			((rx_pkt = ipa3_get_free_page(sys,stats_i)) != NULL)) {
++			ipa3_ctx->stats.page_recycle_stats[stats_i].page_recycled++;
++
+ 		} else {
+ 			/*
+ 			 * Could not find idle page at curr index.
+@@ -2239,6 +2398,7 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ 			curr_wq = (++curr_wq == sys->repl->capacity) ?
+ 								 0 : curr_wq;
+ 		}
++		rx_pkt->sys = sys;
+ 
+ 		dma_sync_single_for_device(ipa3_ctx->pdev,
+ 			rx_pkt->page_data.dma_addr,
+@@ -2276,26 +2436,27 @@ static void ipa3_replenish_rx_page_recycle(struct ipa3_sys_context *sys)
+ 		/* ensure write is done before setting head index */
+ 		mb();
+ 		atomic_set(&sys->repl->head_idx, curr_wq);
+-		atomic_set(&sys->page_recycle_repl->head_idx, curr);
+ 		sys->len = rx_len_cached;
+ 	} else {
+ 		/* we don't expect this will happen */
+ 		IPAERR("failed to provide buffer: %d\n", ret);
+ 		ipa_assert();
+ 	}
+-	spin_unlock_bh(&sys->spinlock);
+-	__trigger_repl_work(sys);
++
++	 if (sys->common_buff_pool)
++	 	__trigger_repl_work(sys->common_sys);
++	 else
++		__trigger_repl_work(sys);
+ 
+ 	if (rx_len_cached <= IPA_DEFAULT_SYS_YELLOW_WM) {
+-		if (sys->ep->client == IPA_CLIENT_APPS_WAN_CONS ||
+-			sys->ep->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
++		if (sys->ep->client == IPA_CLIENT_APPS_WAN_CONS)
+ 			IPA_STATS_INC_CNT(ipa3_ctx->stats.wan_rx_empty);
++		else if (sys->ep->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
++			IPA_STATS_INC_CNT(ipa3_ctx->stats.wan_rx_empty_coal);
+ 		else if (sys->ep->client == IPA_CLIENT_APPS_LAN_CONS)
+ 			IPA_STATS_INC_CNT(ipa3_ctx->stats.lan_rx_empty);
+ 		else
+ 			WARN_ON(1);
+-		queue_delayed_work(sys->wq, &sys->replenish_rx_work,
+-				msecs_to_jiffies(1));
+ 	}
+ 
+ 	return;
+@@ -2791,20 +2952,21 @@ static void free_rx_page(void *chan_user_data, void *xfer_user_data)
+ {
+ 	struct ipa3_rx_pkt_wrapper *rx_pkt = (struct ipa3_rx_pkt_wrapper *)
+ 		xfer_user_data;
+-	struct ipa3_sys_context *sys = rx_pkt->sys;
+-	int i;
+ 
+-	for (i = 0; i < sys->page_recycle_repl->capacity; i++)
+-		if (sys->page_recycle_repl->cache[i] == rx_pkt)
+-			break;
+-	if (i < sys->page_recycle_repl->capacity) {
++	if (!rx_pkt->page_data.is_tmp_alloc) {
++		list_del_init(&rx_pkt->link);
+ 		page_ref_dec(rx_pkt->page_data.page);
+-		sys->page_recycle_repl->cache[i] = NULL;
++		spin_lock_bh(&rx_pkt->sys->common_sys->spinlock);
++		/* Add the element to head. */
++		list_add(&rx_pkt->link,
++			&rx_pkt->sys->page_recycle_repl->page_repl_head);
++		spin_unlock_bh(&rx_pkt->sys->common_sys->spinlock);
++	} else {
++		dma_unmap_page(ipa3_ctx->pdev, rx_pkt->page_data.dma_addr,
++			rx_pkt->len, DMA_FROM_DEVICE);
++		__free_pages(rx_pkt->page_data.page, rx_pkt->page_data.page_order);
++		kmem_cache_free(ipa3_ctx->rx_pkt_wrapper_cache, rx_pkt);
+ 	}
+-	dma_unmap_page(ipa3_ctx->pdev, rx_pkt->page_data.dma_addr,
+-		rx_pkt->len, DMA_FROM_DEVICE);
+-	__free_pages(rx_pkt->page_data.page, rx_pkt->page_data.page_order);
+-	kmem_cache_free(ipa3_ctx->rx_pkt_wrapper_cache, rx_pkt);
+ }
+ 
+ /**
+@@ -2817,7 +2979,6 @@ static void ipa3_cleanup_rx(struct ipa3_sys_context *sys)
+ 	struct ipa3_rx_pkt_wrapper *r;
+ 	u32 head;
+ 	u32 tail;
+-	int i;
+ 
+ 	/*
+ 	 * buffers not consumed by gsi are cleaned up using cleanup callback
+@@ -2865,25 +3026,6 @@ static void ipa3_cleanup_rx(struct ipa3_sys_context *sys)
+ 		kfree(sys->repl);
+ 		sys->repl = NULL;
+ 	}
+-	if (sys->page_recycle_repl) {
+-		for (i = 0; i < sys->page_recycle_repl->capacity; i++) {
+-			rx_pkt = sys->page_recycle_repl->cache[i];
+-			if (rx_pkt) {
+-				dma_unmap_page(ipa3_ctx->pdev,
+-					rx_pkt->page_data.dma_addr,
+-					rx_pkt->len,
+-					DMA_FROM_DEVICE);
+-				__free_pages(rx_pkt->page_data.page,
+-					rx_pkt->page_data.page_order);
+-				kmem_cache_free(
+-					ipa3_ctx->rx_pkt_wrapper_cache,
+-					rx_pkt);
+-			}
+-		}
+-		kfree(sys->page_recycle_repl->cache);
+-		kfree(sys->page_recycle_repl);
+-		sys->page_recycle_repl = NULL;
+-	}
+ }
+ 
+ static struct sk_buff *ipa3_skb_copy_for_client(struct sk_buff *skb, int len)
+@@ -3671,6 +3813,11 @@ static struct sk_buff *handle_page_completion(struct gsi_chan_xfer_notify
+ 		IPAERR("notify->veid > GSI_VEID_MAX\n");
+ 		if (!rx_page.is_tmp_alloc) {
+ 			init_page_count(rx_page.page);
++			spin_lock_bh(&rx_pkt->sys->common_sys->spinlock);
++			/* Add the element to head. */
++			list_add(&rx_pkt->link,
++				&rx_pkt->sys->page_recycle_repl->page_repl_head);
++			spin_unlock_bh(&rx_pkt->sys->common_sys->spinlock);
+ 		} else {
+ 			dma_unmap_page(ipa3_ctx->pdev, rx_page.dma_addr,
+ 					rx_pkt->len, DMA_FROM_DEVICE);
+@@ -3698,11 +3845,15 @@ static struct sk_buff *handle_page_completion(struct gsi_chan_xfer_notify
+ 				list_del_init(&rx_pkt->link);
+ 				if (!rx_page.is_tmp_alloc) {
+ 					init_page_count(rx_page.page);
++					spin_lock_bh(&rx_pkt->sys->common_sys->spinlock);
++					/* Add the element to head. */
++					list_add(&rx_pkt->link,
++						&rx_pkt->sys->page_recycle_repl->page_repl_head);
++					spin_unlock_bh(&rx_pkt->sys->common_sys->spinlock);
+ 				} else {
+ 					dma_unmap_page(ipa3_ctx->pdev, rx_page.dma_addr,
+ 						rx_pkt->len, DMA_FROM_DEVICE);
+-					__free_pages(rx_pkt->page_data.page,
+-								rx_pkt->page_data.page_order);
++					__free_pages(rx_pkt->page_data.page, rx_pkt->page_data.page_order);
+ 				}
+ 				rx_pkt->sys->free_rx_wrapper(rx_pkt);
+ 			}
+@@ -3713,14 +3864,20 @@ static struct sk_buff *handle_page_completion(struct gsi_chan_xfer_notify
+ 			rx_page = rx_pkt->page_data;
+ 			size = rx_pkt->data_len;
+ 
+-			list_del(&rx_pkt->link);
+-			if (rx_page.is_tmp_alloc)
++			list_del_init(&rx_pkt->link);
++			if (rx_page.is_tmp_alloc) {
+ 				dma_unmap_page(ipa3_ctx->pdev, rx_page.dma_addr,
+ 					rx_pkt->len, DMA_FROM_DEVICE);
+-			else
++			} else {
++				spin_lock_bh(&rx_pkt->sys->common_sys->spinlock);
++				/* Add the element back to tail. */
++				list_add_tail(&rx_pkt->link,
++					&rx_pkt->sys->page_recycle_repl->page_repl_head);
++				spin_unlock_bh(&rx_pkt->sys->common_sys->spinlock);
+ 				dma_sync_single_for_cpu(ipa3_ctx->pdev,
+ 					rx_page.dma_addr,
+ 					rx_pkt->len, DMA_FROM_DEVICE);
++			}
+ 			rx_pkt->sys->free_rx_wrapper(rx_pkt);
+ 
+ 			skb_add_rx_frag(rx_skb,
+@@ -3847,20 +4004,6 @@ static void ipa3_rx_napi_chain(struct ipa3_sys_context *sys,
+ 			if (prev_skb) {
+ 				skb_shinfo(prev_skb)->frag_list = NULL;
+ 				sys->pyld_hdlr(first_skb, sys);
+-				/*
+-				 * For coalescing, we have 2 transfer
+-				 * rings to replenish
+-				 */
+-				ipa_ep_idx = ipa3_get_ep_mapping(
+-						IPA_CLIENT_APPS_WAN_CONS);
+-				if (ipa_ep_idx ==
+-					IPA_EP_NOT_ALLOCATED) {
+-					IPAERR("Invalid client.\n");
+-					return;
+-				}
+-				wan_def_sys =
+-					ipa3_ctx->ep[ipa_ep_idx].sys;
+-				wan_def_sys->repl_hdlr(wan_def_sys);
+ 			}
+ 		}
+ 	}
+@@ -5409,6 +5552,7 @@ int ipa3_rx_poll(u32 clnt_hdl, int weight)
+ 		return -EINVAL;
+ 	}
+ 
++	ep->sys->common_sys->napi_sort_page_thrshld_cnt++;
+ start_poll:
+ 	/*
+ 	 * it is guaranteed we already have clock here.
+@@ -5442,6 +5586,7 @@ int ipa3_rx_poll(u32 clnt_hdl, int weight)
+ 	cnt += weight - remain_aggr_weight * ipa3_ctx->ipa_wan_aggr_pkt_cnt;
+ 	/* call repl_hdlr before napi_reschedule / napi_complete */
+ 	ep->sys->repl_hdlr(ep->sys);
++	wan_def_sys->repl_hdlr(wan_def_sys);
+ 	/* When not able to replenish enough descriptors, keep in polling
+ 	 * mode, wait for napi-poll and replenish again.
+ 	 */
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_i.h b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
+index 3abd92f9c..80637cc3c 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
+@@ -1,7 +1,7 @@
+ /* SPDX-License-Identifier: GPL-2.0-only */
+ /*
+  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #ifndef _IPA3_I_H_
+@@ -59,7 +59,11 @@
+ #define IPA_QMAP_HEADER_LENGTH (4)
+ #define IPA_DL_CHECKSUM_LENGTH (8)
+ #define IPA_NUM_DESC_PER_SW_TX (3)
++#define IPA_GENERIC_RX_POOL_SZ_WAN 192
+ #define IPA_GENERIC_RX_POOL_SZ 192
++#define IPA_GENERIC_RX_PAGE_POOL_SZ_FACTOR 2
++#define IPA_GENERIC_RX_CMN_PAGE_POOL_SZ_FACTOR 4
++#define IPA_GENERIC_RX_CMN_TEMP_POOL_SZ_FACTOR 2
+ #define IPA_UC_FINISH_MAX 6
+ #define IPA_UC_WAIT_MIN_SLEEP 1000
+ #define IPA_UC_WAII_MAX_SLEEP 1200
+@@ -84,6 +88,13 @@
+ 
+ #define IPA_WAN_AGGR_PKT_CNT 1
+ 
++#define IPA_PAGE_POLL_DEFAULT_THRESHOLD 15
++#define IPA_PAGE_POLL_THRESHOLD_MAX 30
++
++#define IPA_MAX_NAPI_SORT_PAGE_THRSHLD 3
++#define IPA_MAX_PAGE_WQ_RESCHED_TIME 2
++
++
+ #define IPADBG(fmt, args...) \
+ 	do { \
+ 		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+@@ -103,6 +114,14 @@
+ 				DRV_NAME " %s:%d " fmt, ## args); \
+ 	} while (0)
+ 
++#define IPADBG_CLK(fmt, args...) \
++	do { \
++		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
++		if (ipa3_ctx) \
++			IPA_IPC_LOGGING(ipa3_ctx->logbuf_clk, \
++				DRV_NAME " %s:%d " fmt, ## args); \
++	} while (0)
++
+ #define IPAERR(fmt, args...) \
+ 	do { \
+ 		pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+@@ -1054,6 +1073,12 @@ struct ipa3_repl_ctx {
+ 	atomic_t pending;
+ };
+ 
++struct ipa3_page_repl_ctx {
++	struct list_head page_repl_head;
++	u32 capacity;
++	atomic_t pending;
++};
++
+ /**
+  * struct ipa3_sys_context - IPA GPI pipes context
+  * @head_desc_list: header descriptors list
+@@ -1092,7 +1117,6 @@ struct ipa3_sys_context {
+ 	struct work_struct repl_work;
+ 	void (*repl_hdlr)(struct ipa3_sys_context *sys);
+ 	struct ipa3_repl_ctx *repl;
+-	struct ipa3_repl_ctx *page_recycle_repl;
+ 	u32 pkt_sent;
+ 	struct napi_struct *napi_obj;
+ 	struct list_head pending_pkts[GSI_VEID_MAX];
+@@ -1102,6 +1126,10 @@ struct ipa3_sys_context {
+ 	u32 eob_drop_cnt;
+ 	struct napi_struct napi_tx;
+ 	atomic_t in_napi_context;
++	bool common_buff_pool;
++	struct ipa3_sys_context *common_sys;
++	atomic_t page_avilable;
++	u32 napi_sort_page_thrshld_cnt;
+ 
+ 	/* ordering is important - mutable fields go above */
+ 	struct ipa3_ep_context *ep;
+@@ -1117,6 +1145,10 @@ struct ipa3_sys_context {
+ 	u32 pm_hdl;
+ 	unsigned int napi_sch_cnt;
+ 	unsigned int napi_comp_cnt;
++	struct ipa3_page_repl_ctx *page_recycle_repl;
++	struct workqueue_struct *freepage_wq;
++	struct delayed_work freepage_work;
++	struct tasklet_struct tasklet_find_freepage;
+ 	/* ordering is important - other immutable fields go below */
+ };
+ 
+@@ -1423,8 +1455,10 @@ enum ipa3_config_this_ep {
+ 
+ struct ipa3_page_recycle_stats {
+ 	u64 total_replenished;
++	u64 page_recycled;
+ 	u64 tmp_alloc;
+ };
++
+ struct ipa3_stats {
+ 	u32 tx_sw_pkts;
+ 	u32 tx_hw_pkts;
+@@ -1439,6 +1473,7 @@ struct ipa3_stats {
+ 	u32 aggr_close;
+ 	u32 wan_aggr_close;
+ 	u32 wan_rx_empty;
++	u32 wan_rx_empty_coal;
+ 	u32 wan_repl_rx_empty;
+ 	u32 lan_rx_empty;
+ 	u32 lan_repl_rx_empty;
+@@ -1451,6 +1486,10 @@ struct ipa3_stats {
+ 	u64 lower_order;
+ 	struct ipa3_page_recycle_stats page_recycle_stats[2];
+ 	u32 pipe_setup_fail_cnt;
++	u64 page_recycle_cnt[2][IPA_PAGE_POLL_THRESHOLD_MAX];
++	u64 num_sort_tasklet_sched[3];
++	u64 num_of_times_wq_reschd;
++	u64 page_recycle_cnt_in_tasklet;
+ };
+ 
+ /* offset for each stats */
+@@ -1913,6 +1952,7 @@ struct ipa3_app_clock_vote {
+  * @modem_cfg_emb_pipe_flt: modem configure embedded pipe filtering rules
+  * @logbuf: ipc log buffer for high priority messages
+  * @logbuf_low: ipc log buffer for low priority messages
++ * @logbuf_clk: ipc log buffer for ipa clock messages
+  * @ipa_wdi2: using wdi-2.0
+  * @ipa_fltrt_not_hashable: filter/route rules not hashable
+  * @use_64_bit_dma_mask: using 64bits dma mask
+@@ -2052,6 +2092,7 @@ struct ipa3_context {
+ 	void *smem_pipe_mem;
+ 	void *logbuf;
+ 	void *logbuf_low;
++	void *logbuf_clk;
+ 	struct ipa3_controller *ctrl;
+ 	struct idr ipa_idr;
+ 	struct platform_device *master_pdev;
+@@ -2164,7 +2205,10 @@ struct ipa3_context {
+ 	bool fnr_stats_not_supported;
+ 	bool is_device_crashed;
+ 	int ipa_pil_load;
+-
++	u8 page_poll_threshold;
++	bool wan_common_page_pool;
++	u32 ipa_max_napi_sort_page_thrshld;
++	u32 page_wq_reschd_time;
+ };
+ 
+ struct ipa3_plat_drv_res {
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_mpm.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_mpm.c
+index 8b900ec01..c4947a8bc 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_mpm.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_mpm.c
+@@ -536,7 +536,7 @@ static int ipa_mpm_set_dma_mode(enum ipa_client_type src_pipe,
+ 	ep_cfg.mode.dst = dst_pipe;
+ 	ep_cfg.seq.set_dynamic = true;
+ 
+-	result = ipa_cfg_ep(ipa_get_ep_mapping(src_pipe), &ep_cfg);
++	result = ipa3_cfg_ep(ipa_get_ep_mapping(src_pipe), &ep_cfg);
+ 	IPA_MPM_FUNC_EXIT();
+ 
+ destroy_imm_cmd:
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_rt.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_rt.c
+index 5839350db..21e71fdf5 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_rt.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_rt.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #include <linux/bitops.h>
+@@ -1082,12 +1083,14 @@ static int __ipa_create_rt_entry(struct ipa3_rt_entry **entry,
+ static int __ipa_finish_rt_rule_add(struct ipa3_rt_entry *entry, u32 *rule_hdl,
+ 		struct ipa3_rt_tbl *tbl)
+ {
+-	int id;
++	int id, res = 0;
+ 
+ 	if (tbl->rule_cnt < IPA_RULE_CNT_MAX)
+ 		tbl->rule_cnt++;
+-	else
+-		goto table_insert_failed;
++	else {
++		res = -EINVAL;
++		goto failed;
++	}
+ 	if (entry->hdr)
+ 		entry->hdr->ref_cnt++;
+ 	else if (entry->proc_ctx)
+@@ -1096,6 +1099,7 @@ static int __ipa_finish_rt_rule_add(struct ipa3_rt_entry *entry, u32 *rule_hdl,
+ 	if (id < 0) {
+ 		IPAERR_RL("failed to add to tree\n");
+ 		WARN_ON_RATELIMIT_IPA(1);
++		res = -EPERM;
+ 		goto ipa_insert_failed;
+ 	}
+ 	IPADBG("add rt rule tbl_idx=%d rule_cnt=%d rule_id=%d\n",
+@@ -1110,11 +1114,11 @@ static int __ipa_finish_rt_rule_add(struct ipa3_rt_entry *entry, u32 *rule_hdl,
+ 		entry->hdr->ref_cnt--;
+ 	else if (entry->proc_ctx)
+ 		entry->proc_ctx->ref_cnt--;
++failed:
+ 	idr_remove(tbl->rule_ids, entry->rule_id);
+-table_insert_failed:
+ 	list_del(&entry->link);
+ 	kmem_cache_free(ipa3_ctx->rt_rule_cache, entry);
+-	return -EPERM;
++	return res;
+ }
+ 
+ static int __ipa_add_rt_rule(enum ipa_ip_type ip, const char *name,
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipahal/ipahal_fltrt_i.h b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipahal/ipahal_fltrt_i.h
+index 5626d7825..aef1697f5 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipahal/ipahal_fltrt_i.h
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/ipahal/ipahal_fltrt_i.h
+@@ -44,7 +44,7 @@ enum ipa_fltrt_equations {
+ #define IPA3_0_HW_TBL_ADDR_MASK (127)
+ #define IPA3_0_HW_RULE_BUF_SIZE (256)
+ #define IPA3_0_HW_RULE_START_ALIGNMENT (7)
+-#define IPA3_0_HW_RULE_PREFETCH_BUF_SIZE (128)
++#define IPA3_0_HW_RULE_PREFETCH_BUF_SIZE (256)
+ 
+ 
+ /*
+diff --git a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
+index ee44f0fd9..5696a7c4b 100644
+--- a/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
++++ b/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
+@@ -509,8 +509,8 @@ static void ipa3_copy_qmi_flt_rule_ex(
+ 	 */
+ 	flt_spec_ptr = (struct ipa_filter_spec_ex_type_v01 *) flt_spec_ptr_void;
+ 
+-	q6_ul_flt_rule_ptr->ip = flt_spec_ptr->ip_type;
+-	q6_ul_flt_rule_ptr->action = flt_spec_ptr->filter_action;
++	q6_ul_flt_rule_ptr->ip = (enum ipa_ip_type)flt_spec_ptr->ip_type;
++	q6_ul_flt_rule_ptr->action = (enum ipa_flt_action)flt_spec_ptr->filter_action;
+ 	if (flt_spec_ptr->is_routing_table_index_valid == true)
+ 		q6_ul_flt_rule_ptr->rt_tbl_idx =
+ 		flt_spec_ptr->route_table_index;
+@@ -3175,7 +3175,7 @@ static void tethering_stats_poll_queue(struct work_struct *work)
+ 
+ 	/* Schedule again only if there's an active polling interval */
+ 	if (ipa3_rmnet_ctx.polling_interval != 0)
+-		queue_delayed_work(system_power_efficient_wq, &ipa_tether_stats_poll_wakequeue_work,
++		schedule_delayed_work(&ipa_tether_stats_poll_wakequeue_work,
+ 			msecs_to_jiffies(ipa3_rmnet_ctx.polling_interval*1000));
+ }
+ 
+@@ -3267,7 +3267,7 @@ int rmnet_ipa3_poll_tethering_stats(struct wan_ioctl_poll_tethering_stats *data)
+ 		return 0;
+ 	}
+ 
+-	queue_delayed_work(system_power_efficient_wq, &ipa_tether_stats_poll_wakequeue_work, 0);
++	schedule_delayed_work(&ipa_tether_stats_poll_wakequeue_work, 0);
+ 	return 0;
+ }
+ 
+@@ -4950,6 +4950,10 @@ int rmnet_ipa3_get_wan_mtu(
+ 	int rmnet_index;
+ 
+ 	mux_channel = rmnet_ipa3_ctx->mux_channel;
++
++	/* prevent string buffer overflows */
++	data->if_name[IPA_RESOURCE_NAME_MAX-1] = '\0';
++
+ 	rmnet_index =
+ 		find_vchannel_name_index(data->if_name);
+ 
+diff --git a/techpack/datarmnet-ext/offload/rmnet_offload_main.c b/techpack/datarmnet-ext/offload/rmnet_offload_main.c
+index 54b394356..1468e31cb 100644
+--- a/techpack/datarmnet-ext/offload/rmnet_offload_main.c
++++ b/techpack/datarmnet-ext/offload/rmnet_offload_main.c
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -22,6 +23,10 @@
+ #include "rmnet_offload_engine.h"
+ #include "rmnet_offload_stats.h"
+ static const char*DATARMNET9be3ddbe97[]__always_unused={
++"\x49\x35\x39\x30\x66\x36\x32\x30\x63\x65\x61\x33\x37\x37\x30\x65\x66\x62\x38\x62\x63\x33\x31\x39\x65\x33\x61\x30\x33\x32\x32\x62\x62\x63\x38\x61\x63\x61\x66\x38\x35"
++,
++"\x49\x33\x38\x33\x35\x64\x61\x37\x38\x66\x30\x33\x30\x63\x31\x37\x35\x62\x62\x36\x63\x65\x31\x35\x63\x62\x63\x62\x37\x33\x63\x35\x30\x32\x37\x32\x64\x64\x37\x66\x32"
++,
+ "\x49\x37\x32\x31\x62\x64\x36\x39\x35\x32\x31\x66\x65\x34\x61\x61\x38\x64\x61\x65\x62\x65\x66\x62\x32\x38\x30\x64\x38\x64\x31\x35\x30\x39\x66\x39\x31\x65\x36\x37\x33"
+ ,
+ "\x49\x36\x64\x36\x66\x39\x32\x35\x66\x33\x65\x33\x32\x31\x65\x31\x32\x32\x38\x64\x33\x38\x37\x33\x66\x63\x37\x38\x32\x31\x38\x62\x61\x39\x30\x65\x39\x34\x35\x30\x36"
+@@ -78,58 +83,73 @@ DATARMNET2991ac9aa9);}static bool DATARMNET1a7ed9a6a2(struct
+ rmnet_frag_descriptor*DATARMNET9d1b321642,struct DATARMNETd812bcdbb5*
+ DATARMNET458b70e7e5){struct DATARMNET4287f07234*DATARMNET8814564ab9=&
+ DATARMNET458b70e7e5->DATARMNET144d119066;u8*DATARMNETdf2dbc641f;u16 
+-DATARMNET5affe290b8;u16 DATARMNETdaa9248df1;if(DATARMNET9d1b321642->hdrs_valid){
+-struct DATARMNETd2991e8952*DATARMNET2e7cc88971,DATARMNETd1ff6cd568;
+-DATARMNET8814564ab9->DATARMNET388842c721=DATARMNET9d1b321642->ip_proto;
+-DATARMNET8814564ab9->DATARMNET4ca5ac9de1=DATARMNET9d1b321642->ip_len;
+-DATARMNET8814564ab9->DATARMNET7fa8b2acbf=DATARMNET9d1b321642->trans_proto;
+-DATARMNET8814564ab9->DATARMNET0aeee57ceb=DATARMNET9d1b321642->trans_len;
+-DATARMNET5affe290b8=DATARMNET9d1b321642->len;if(DATARMNET8814564ab9->
+-DATARMNET388842c721==(0xd11+230-0xdf3)){struct DATARMNET308c06fca6*
+-DATARMNET86f1f2cdc9,DATARMNETbf6548198e;DATARMNET86f1f2cdc9=
++DATARMNET5affe290b8;u16 DATARMNETdaa9248df1;DATARMNET5affe290b8=
++DATARMNET9d1b321642->len;DATARMNET458b70e7e5->DATARMNET3eb91ee54d=true;if(
++unlikely(!(DATARMNET9d1b321642->dev->features&NETIF_F_RXCSUM))){goto 
++DATARMNETaabe3a05f8;}if(DATARMNET9d1b321642->hdrs_valid){struct 
++DATARMNET0b82084e89*DATARMNET75be5f3406,DATARMNETc82d2f4e16;struct 
++DATARMNETd2991e8952*DATARMNET2e7cc88971,DATARMNETd1ff6cd568;DATARMNET8814564ab9
++->DATARMNET388842c721=DATARMNET9d1b321642->ip_proto;DATARMNET8814564ab9->
++DATARMNET4ca5ac9de1=DATARMNET9d1b321642->ip_len;DATARMNET8814564ab9->
++DATARMNET7fa8b2acbf=DATARMNET9d1b321642->trans_proto;DATARMNET8814564ab9->
++DATARMNET0aeee57ceb=DATARMNET9d1b321642->trans_len;DATARMNET5affe290b8=
++DATARMNET9d1b321642->len;if(DATARMNET8814564ab9->DATARMNET388842c721==
++(0xd11+230-0xdf3)){struct DATARMNET308c06fca6*DATARMNET86f1f2cdc9,
++DATARMNETbf6548198e;DATARMNET86f1f2cdc9=rmnet_frag_header_ptr(
++DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*DATARMNET86f1f2cdc9),&
++DATARMNETbf6548198e);if(!DATARMNET86f1f2cdc9)goto DATARMNETaabe3a05f8;
++DATARMNET8814564ab9->DATARMNET1a2be7b6c2=DATARMNET86f1f2cdc9->
++DATARMNET9bbd2ca483;DATARMNET8814564ab9->DATARMNET0a28fa80f4=DATARMNET86f1f2cdc9
++->DATARMNET11ef55b2bb;DATARMNET8814564ab9->DATARMNET19b03754c4=
++DATARMNET86f1f2cdc9->DATARMNET1eb6c27583;DATARMNET8814564ab9->
++DATARMNET57bf608183=DATARMNET86f1f2cdc9->DATARMNET03e081f69f;DATARMNET8814564ab9
++->DATARMNETcf915688f5=DATARMNET86f1f2cdc9->DATARMNET2c091223da;}else{struct 
++DATARMNET64bb8f616e*DATARMNETbf55123e5b,DATARMNETcf1d9e2c1e;DATARMNETbf55123e5b=
+ rmnet_frag_header_ptr(DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*
+-DATARMNET86f1f2cdc9),&DATARMNETbf6548198e);if(!DATARMNET86f1f2cdc9)goto 
+-DATARMNETaabe3a05f8;DATARMNET8814564ab9->DATARMNET1a2be7b6c2=DATARMNET86f1f2cdc9
+-->DATARMNET9bbd2ca483;DATARMNET8814564ab9->DATARMNET0a28fa80f4=
+-DATARMNET86f1f2cdc9->DATARMNET11ef55b2bb;DATARMNET8814564ab9->
+-DATARMNET19b03754c4=DATARMNET86f1f2cdc9->DATARMNET1eb6c27583;DATARMNET8814564ab9
+-->DATARMNET57bf608183=DATARMNET86f1f2cdc9->DATARMNET03e081f69f;
+-DATARMNET8814564ab9->DATARMNETcf915688f5=DATARMNET86f1f2cdc9->
+-DATARMNET2c091223da;}else{struct DATARMNET64bb8f616e*DATARMNETbf55123e5b,
+-DATARMNETcf1d9e2c1e;DATARMNETbf55123e5b=rmnet_frag_header_ptr(
+-DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*DATARMNETbf55123e5b),&
+-DATARMNETcf1d9e2c1e);if(!DATARMNETbf55123e5b)goto DATARMNETaabe3a05f8;memcpy(&
+-DATARMNET8814564ab9->DATARMNET949c2754de[(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b
+-->DATARMNET31202449fc[(0xd2d+202-0xdf7)],sizeof(DATARMNETbf55123e5b->
+-DATARMNET31202449fc));memcpy(&DATARMNET8814564ab9->DATARMNET45ec858bc5[
+-(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b->DATARMNETc657c0a139[(0xd2d+202-0xdf7)],
+-sizeof(DATARMNETbf55123e5b->DATARMNETc657c0a139));DATARMNET8814564ab9->
+-DATARMNETabd58f7f89=DATARMNETbf55123e5b->DATARMNET0687f7ecdc;}
++DATARMNETbf55123e5b),&DATARMNETcf1d9e2c1e);if(!DATARMNETbf55123e5b)goto 
++DATARMNETaabe3a05f8;memcpy(&DATARMNET8814564ab9->DATARMNET949c2754de[
++(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b->DATARMNET31202449fc[(0xd2d+202-0xdf7)],
++sizeof(DATARMNETbf55123e5b->DATARMNET31202449fc));memcpy(&DATARMNET8814564ab9->
++DATARMNET45ec858bc5[(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b->DATARMNETc657c0a139
++[(0xd2d+202-0xdf7)],sizeof(DATARMNETbf55123e5b->DATARMNETc657c0a139));
++DATARMNET8814564ab9->DATARMNETabd58f7f89=DATARMNETbf55123e5b->
++DATARMNET0687f7ecdc;if(DATARMNET8814564ab9->DATARMNET4ca5ac9de1>sizeof(*
++DATARMNETbf55123e5b)){int DATARMNET0afb05821a;__be16 DATARMNET833503918f;bool 
++DATARMNETcd214ed34c;u8 DATARMNET615595a09c=DATARMNETbf55123e5b->
++DATARMNET7244bfdc4f;DATARMNET0afb05821a=rmnet_frag_ipv6_skip_exthdr(
++DATARMNET9d1b321642,sizeof(*DATARMNETbf55123e5b),&DATARMNET615595a09c,&
++DATARMNET833503918f,&DATARMNETcd214ed34c);if(DATARMNET0afb05821a<
++(0xd2d+202-0xdf7)||DATARMNET833503918f||DATARMNETcd214ed34c){if(
++DATARMNET615595a09c==DATARMNET5b166167a8)DATARMNET8814564ab9->
++DATARMNET4ca5ac9de1+=(0xd35+210-0xdff);DATARMNETa00cda79d0(DATARMNET807e4dad18);
++goto DATARMNETaabe3a05f8;}}}DATARMNET75be5f3406=rmnet_frag_header_ptr(
++DATARMNET9d1b321642,DATARMNET8814564ab9->DATARMNET4ca5ac9de1,sizeof(*
++DATARMNET75be5f3406),&DATARMNETc82d2f4e16);if(!DATARMNET75be5f3406)goto 
++DATARMNETaabe3a05f8;DATARMNET8814564ab9->DATARMNETa60d2ae3f6=DATARMNET75be5f3406
++->DATARMNET1b1c406ae9;DATARMNET8814564ab9->DATARMNET5e7452ec23=
++DATARMNET75be5f3406->DATARMNETdf0e8545ee;if(DATARMNET8814564ab9->
++DATARMNET7fa8b2acbf==DATARMNETfd5c3d30e5){__be32 DATARMNET0849981c7c;
+ DATARMNET2e7cc88971=rmnet_frag_header_ptr(DATARMNET9d1b321642,
+ DATARMNET8814564ab9->DATARMNET4ca5ac9de1,sizeof(*DATARMNET2e7cc88971),&
+-DATARMNETd1ff6cd568);if(!DATARMNET2e7cc88971)goto DATARMNETaabe3a05f8;
+-DATARMNET8814564ab9->DATARMNETa60d2ae3f6=DATARMNET2e7cc88971->
+-DATARMNET6acbeeebb1;DATARMNET8814564ab9->DATARMNET5e7452ec23=DATARMNET2e7cc88971
+-->DATARMNET29b8c05d14;if(DATARMNET8814564ab9->DATARMNET7fa8b2acbf==
+-DATARMNETfd5c3d30e5){__be32 DATARMNET0849981c7c;if(DATARMNET9d1b321642->
+-tcp_seq_set)DATARMNET0849981c7c=DATARMNET9d1b321642->tcp_seq;else 
+-DATARMNET0849981c7c=DATARMNET2e7cc88971->DATARMNETb3e70104e0;DATARMNET8814564ab9
+-->DATARMNETbc28a5970f=ntohl(DATARMNET0849981c7c);}DATARMNET458b70e7e5->
+-DATARMNET645e8912b8=DATARMNETcb7325e02d(DATARMNET458b70e7e5);DATARMNET458b70e7e5
+-->DATARMNET1ef22e4c76=DATARMNET9d1b321642->len-DATARMNET9d1b321642->ip_len-
+-DATARMNET9d1b321642->trans_len;DATARMNET458b70e7e5->DATARMNET719f68fb88=
+-DATARMNET9d1b321642;return false;}DATARMNETdf2dbc641f=rmnet_frag_data_ptr(
+-DATARMNET9d1b321642);if(unlikely(!DATARMNETdf2dbc641f))return true;
+-DATARMNET5affe290b8=DATARMNET9d1b321642->len;DATARMNET458b70e7e5->
+-DATARMNET3eb91ee54d=true;DATARMNET8814564ab9->DATARMNET388842c721=(
+-DATARMNETdf2dbc641f[(0xd2d+202-0xdf7)]&(0xbf7+4405-0x1c3c))>>(0xd11+230-0xdf3);
+-if(DATARMNET8814564ab9->DATARMNET388842c721==(0xd11+230-0xdf3)){struct 
+-DATARMNET308c06fca6*DATARMNET86f1f2cdc9,DATARMNETbf6548198e;DATARMNET86f1f2cdc9=
+-rmnet_frag_header_ptr(DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*
+-DATARMNET86f1f2cdc9),&DATARMNETbf6548198e);if(!DATARMNET86f1f2cdc9)goto 
+-DATARMNETaabe3a05f8;DATARMNET8814564ab9->DATARMNET4ca5ac9de1=DATARMNET86f1f2cdc9
+-->DATARMNET610d06a887*(0xd11+230-0xdf3);DATARMNET8814564ab9->DATARMNET7fa8b2acbf
+-=DATARMNET86f1f2cdc9->DATARMNET953d32410f;DATARMNET8814564ab9->
++DATARMNETd1ff6cd568);if(!DATARMNET2e7cc88971)goto DATARMNETaabe3a05f8;if(
++DATARMNET9d1b321642->tcp_seq_set)DATARMNET0849981c7c=DATARMNET9d1b321642->
++tcp_seq;else DATARMNET0849981c7c=DATARMNET2e7cc88971->DATARMNETb3e70104e0;
++DATARMNET8814564ab9->DATARMNETbc28a5970f=ntohl(DATARMNET0849981c7c);}
++DATARMNET458b70e7e5->DATARMNET645e8912b8=DATARMNETcb7325e02d(DATARMNET458b70e7e5
++);DATARMNET458b70e7e5->DATARMNET1ef22e4c76=DATARMNET9d1b321642->len-
++DATARMNET9d1b321642->ip_len-DATARMNET9d1b321642->trans_len;DATARMNET458b70e7e5->
++DATARMNET719f68fb88=DATARMNET9d1b321642;DATARMNET458b70e7e5->DATARMNET3eb91ee54d
++=false;return false;}DATARMNETdf2dbc641f=rmnet_frag_data_ptr(DATARMNET9d1b321642
++);if(unlikely(!DATARMNETdf2dbc641f))return true;DATARMNET8814564ab9->
++DATARMNET388842c721=(DATARMNETdf2dbc641f[(0xd2d+202-0xdf7)]&(0xbf7+4405-0x1c3c))
++>>(0xd11+230-0xdf3);if(DATARMNET8814564ab9->DATARMNET388842c721==
++(0xd11+230-0xdf3)){struct DATARMNET308c06fca6*DATARMNET86f1f2cdc9,
++DATARMNETbf6548198e;DATARMNET86f1f2cdc9=rmnet_frag_header_ptr(
++DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*DATARMNET86f1f2cdc9),&
++DATARMNETbf6548198e);if(!DATARMNET86f1f2cdc9)goto DATARMNETaabe3a05f8;
++DATARMNET8814564ab9->DATARMNET4ca5ac9de1=DATARMNET86f1f2cdc9->
++DATARMNET610d06a887*(0xd11+230-0xdf3);DATARMNET8814564ab9->DATARMNET7fa8b2acbf=
++DATARMNET86f1f2cdc9->DATARMNET953d32410f;DATARMNET8814564ab9->
+ DATARMNET1a2be7b6c2=DATARMNET86f1f2cdc9->DATARMNET9bbd2ca483;DATARMNET8814564ab9
+ ->DATARMNET0a28fa80f4=DATARMNET86f1f2cdc9->DATARMNET11ef55b2bb;
+ DATARMNET8814564ab9->DATARMNET19b03754c4=DATARMNET86f1f2cdc9->
+@@ -142,29 +162,30 @@ DATARMNET8e175ac02d);DATARMNET458b70e7e5->DATARMNET8f59f5a745=
+ DATARMNETdaa9248df1!=DATARMNET5affe290b8;}else if(DATARMNET8814564ab9->
+ DATARMNET388842c721==(0xd03+244-0xdf1)){struct DATARMNET64bb8f616e*
+ DATARMNETbf55123e5b,DATARMNETcf1d9e2c1e;int DATARMNET0549c61885;__be16 
+-DATARMNET833503918f;u8 DATARMNET3f56a2bcf4;DATARMNETbf55123e5b=
+-rmnet_frag_header_ptr(DATARMNET9d1b321642,(0xd2d+202-0xdf7),sizeof(*
+-DATARMNETbf55123e5b),&DATARMNETcf1d9e2c1e);if(!DATARMNETbf55123e5b)goto 
++DATARMNET833503918f;bool DATARMNETcd214ed34c;u8 DATARMNET3f56a2bcf4;
++DATARMNETbf55123e5b=rmnet_frag_header_ptr(DATARMNET9d1b321642,(0xd2d+202-0xdf7),
++sizeof(*DATARMNETbf55123e5b),&DATARMNETcf1d9e2c1e);if(!DATARMNETbf55123e5b)goto 
+ DATARMNETaabe3a05f8;DATARMNET3f56a2bcf4=DATARMNETbf55123e5b->DATARMNET7244bfdc4f
+ ;DATARMNET0549c61885=rmnet_frag_ipv6_skip_exthdr(DATARMNET9d1b321642,sizeof(*
+-DATARMNETbf55123e5b),&DATARMNET3f56a2bcf4,&DATARMNET833503918f);if(
+-DATARMNET0549c61885<(0xd2d+202-0xdf7)){goto DATARMNETaabe3a05f8;}
+-DATARMNET8814564ab9->DATARMNET4ca5ac9de1=(u16)DATARMNET0549c61885;
+-DATARMNET8814564ab9->DATARMNET7fa8b2acbf=DATARMNET3f56a2bcf4;memcpy(&
+-DATARMNET8814564ab9->DATARMNET949c2754de[(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b
+-->DATARMNET31202449fc[(0xd2d+202-0xdf7)],sizeof(DATARMNETbf55123e5b->
+-DATARMNET31202449fc));memcpy(&DATARMNET8814564ab9->DATARMNET45ec858bc5[
+-(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b->DATARMNETc657c0a139[(0xd2d+202-0xdf7)],
+-sizeof(DATARMNETbf55123e5b->DATARMNETc657c0a139));DATARMNET8814564ab9->
+-DATARMNETabd58f7f89=DATARMNETbf55123e5b->DATARMNET0687f7ecdc;if(
+-DATARMNET833503918f){if(DATARMNET8814564ab9->DATARMNET7fa8b2acbf==
+-DATARMNET5b166167a8)DATARMNET8814564ab9->DATARMNET4ca5ac9de1+=(0xd35+210-0xdff);
+-DATARMNETa00cda79d0(DATARMNET807e4dad18);goto DATARMNETaabe3a05f8;}
+-DATARMNETdaa9248df1=ntohs(DATARMNETbf55123e5b->DATARMNETaa340485c5)+sizeof(*
+-DATARMNETbf55123e5b);DATARMNET458b70e7e5->DATARMNET8f59f5a745=
+-DATARMNETdaa9248df1!=DATARMNET5affe290b8;}else{return true;}if(
+-DATARMNET8814564ab9->DATARMNET7fa8b2acbf==DATARMNETfd5c3d30e5){struct 
+-DATARMNETd2991e8952*DATARMNET2e7cc88971,DATARMNETd1ff6cd568;DATARMNET2e7cc88971=
++DATARMNETbf55123e5b),&DATARMNET3f56a2bcf4,&DATARMNET833503918f,&
++DATARMNETcd214ed34c);if(DATARMNET0549c61885<(0xd2d+202-0xdf7)){goto 
++DATARMNETaabe3a05f8;}DATARMNET8814564ab9->DATARMNET4ca5ac9de1=(u16)
++DATARMNET0549c61885;DATARMNET8814564ab9->DATARMNET7fa8b2acbf=DATARMNET3f56a2bcf4
++;memcpy(&DATARMNET8814564ab9->DATARMNET949c2754de[(0xd2d+202-0xdf7)],&
++DATARMNETbf55123e5b->DATARMNET31202449fc[(0xd2d+202-0xdf7)],sizeof(
++DATARMNETbf55123e5b->DATARMNET31202449fc));memcpy(&DATARMNET8814564ab9->
++DATARMNET45ec858bc5[(0xd2d+202-0xdf7)],&DATARMNETbf55123e5b->DATARMNETc657c0a139
++[(0xd2d+202-0xdf7)],sizeof(DATARMNETbf55123e5b->DATARMNETc657c0a139));
++DATARMNET8814564ab9->DATARMNETabd58f7f89=DATARMNETbf55123e5b->
++DATARMNET0687f7ecdc;if(DATARMNET833503918f||DATARMNETcd214ed34c){if(
++DATARMNET8814564ab9->DATARMNET7fa8b2acbf==DATARMNET5b166167a8)
++DATARMNET8814564ab9->DATARMNET4ca5ac9de1+=(0xd35+210-0xdff);DATARMNETa00cda79d0(
++DATARMNET807e4dad18);goto DATARMNETaabe3a05f8;}DATARMNETdaa9248df1=ntohs(
++DATARMNETbf55123e5b->DATARMNETaa340485c5)+sizeof(*DATARMNETbf55123e5b);
++DATARMNET458b70e7e5->DATARMNET8f59f5a745=DATARMNETdaa9248df1!=
++DATARMNET5affe290b8;}else{return true;}if(DATARMNET8814564ab9->
++DATARMNET7fa8b2acbf==DATARMNETfd5c3d30e5){struct DATARMNETd2991e8952*
++DATARMNET2e7cc88971,DATARMNETd1ff6cd568;DATARMNET2e7cc88971=
+ rmnet_frag_header_ptr(DATARMNET9d1b321642,DATARMNET8814564ab9->
+ DATARMNET4ca5ac9de1,sizeof(*DATARMNET2e7cc88971),&DATARMNETd1ff6cd568);if(!
+ DATARMNET2e7cc88971)goto DATARMNETaabe3a05f8;DATARMNET8814564ab9->
+diff --git a/techpack/datarmnet/core/Android.mk b/techpack/datarmnet/core/Android.mk
+index 8df2c97d1..f358d0b2e 100644
+--- a/techpack/datarmnet/core/Android.mk
++++ b/techpack/datarmnet/core/Android.mk
+@@ -2,8 +2,6 @@ ifneq ($(TARGET_PRODUCT),qssi)
+ RMNET_CORE_DLKM_PLATFORMS_LIST := lahaina
+ RMNET_CORE_DLKM_PLATFORMS_LIST += holi
+ RMNET_CORE_DLKM_PLATFORMS_LIST += monaco
+-RMNET_CORE_DLKM_PLATFORMS_LIST += monaco_go
+-RMNET_CORE_DLKM_PLATFORMS_LIST += monaco_go_aon
+ 
+ ifeq ($(call is-board-platform-in-list, $(RMNET_CORE_DLKM_PLATFORMS_LIST)),true)
+ #Make file to create RMNET_CORE DLKM
+diff --git a/techpack/datarmnet/core/dfc_qmap.c b/techpack/datarmnet/core/dfc_qmap.c
+index f371a0f6e..6afc12cdb 100644
+--- a/techpack/datarmnet/core/dfc_qmap.c
++++ b/techpack/datarmnet/core/dfc_qmap.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+  */
+ 
+ #include <net/pkt_sched.h>
+@@ -139,11 +140,13 @@ static void dfc_qmap_send_cmd(struct sk_buff *skb)
+ {
+ 	trace_dfc_qmap(skb->data, skb->len, false);
+ 
+-	if (unlikely(!rmnet_ctl || !rmnet_ctl->send) ||
+-	    rmnet_ctl->send(rmnet_ctl_handle, skb)) {
+-		pr_err("Failed to send to rmnet ctl\n");
++	if (unlikely(!rmnet_ctl || !rmnet_ctl->send)) {
+ 		kfree_skb(skb);
++		return;
+ 	}
++
++	if (rmnet_ctl->send(rmnet_ctl_handle, skb))
++		pr_err("Failed to send to rmnet ctl\n");
+ }
+ 
+ static void dfc_qmap_send_inband_ack(struct dfc_qmi_data *dfc,
+diff --git a/techpack/datarmnet/core/rmnet_config.c b/techpack/datarmnet/core/rmnet_config.c
+index b341099c1..47cc316bd 100644
+--- a/techpack/datarmnet/core/rmnet_config.c
++++ b/techpack/datarmnet/core/rmnet_config.c
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -641,6 +642,7 @@ EXPORT_SYMBOL(rmnet_init_qmi_pt);
+ 
+ void rmnet_get_packets(void *port, u64 *rx, u64 *tx)
+ {
++	struct net_device *dev;
+ 	struct rmnet_priv *priv;
+ 	struct rmnet_pcpu_stats *ps;
+ 	unsigned int cpu, start;
+@@ -654,8 +656,12 @@ void rmnet_get_packets(void *port, u64 *rx, u64 *tx)
+ 	*tx = 0;
+ 	*rx = 0;
+ 	rcu_read_lock();
+-	hash_for_each(((struct rmnet_port *)port)->muxed_ep, bkt, ep, hlnode) {
+-		priv = netdev_priv(ep->egress_dev);
++	hash_for_each_rcu(((struct rmnet_port *)port)->muxed_ep, bkt, ep,
++			  hlnode) {
++		dev = ep->egress_dev;
++		if (!dev)
++			continue;
++		priv = netdev_priv(dev);
+ 		for_each_possible_cpu(cpu) {
+ 			ps = per_cpu_ptr(priv->pcpu_stats, cpu);
+ 			do {
+diff --git a/techpack/datarmnet/core/rmnet_ctl_client.c b/techpack/datarmnet/core/rmnet_ctl_client.c
+index 4958deac1..1ec53dea3 100644
+--- a/techpack/datarmnet/core/rmnet_ctl_client.c
++++ b/techpack/datarmnet/core/rmnet_ctl_client.c
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+  *
+  * RMNET_CTL client handlers
+  *
+@@ -171,8 +172,10 @@ int rmnet_ctl_send_client(void *handle, struct sk_buff *skb)
+ 	struct rmnet_ctl_dev *dev;
+ 	int rc = -EINVAL;
+ 
+-	if (client != rcu_dereference(ctl_ep.client))
++	if (client != rcu_dereference(ctl_ep.client)) {
++		kfree_skb(skb);
+ 		return rc;
++	}
+ 
+ 	rmnet_ctl_log_info("TX", skb->data, skb->len);
+ 
+@@ -181,11 +184,13 @@ int rmnet_ctl_send_client(void *handle, struct sk_buff *skb)
+ 	dev = rcu_dereference(ctl_ep.dev);
+ 	if (dev && dev->xmit)
+ 		rc = dev->xmit(dev, skb);
++	else
++		kfree_skb(skb);
+ 
+ 	rcu_read_unlock();
+ 
+ 	if (rc)
+-		rmnet_ctl_log_err("TXE", rc, skb->data, skb->len);
++		rmnet_ctl_log_err("TXE", rc, NULL, 0);
+ 
+ 	return rc;
+ }
+diff --git a/techpack/datarmnet/core/rmnet_descriptor.c b/techpack/datarmnet/core/rmnet_descriptor.c
+index f7818d90a..808346767 100644
+--- a/techpack/datarmnet/core/rmnet_descriptor.c
++++ b/techpack/datarmnet/core/rmnet_descriptor.c
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -322,12 +323,13 @@ int rmnet_frag_descriptor_add_frags_from(struct rmnet_frag_descriptor *to,
+ EXPORT_SYMBOL(rmnet_frag_descriptor_add_frags_from);
+ 
+ int rmnet_frag_ipv6_skip_exthdr(struct rmnet_frag_descriptor *frag_desc,
+-				int start, u8 *nexthdrp, __be16 *fragp)
++				int start, u8 *nexthdrp, __be16 *frag_offp,
++				bool *frag_hdrp)
+ {
+ 	u8 nexthdr = *nexthdrp;
+ 
+-	*fragp = 0;
+-
++	*frag_offp = 0;
++	*frag_hdrp = false;
+ 	while (ipv6_ext_hdr(nexthdr)) {
+ 		struct ipv6_opt_hdr *hp, __hp;
+ 		int hdrlen;
+@@ -349,8 +351,9 @@ int rmnet_frag_ipv6_skip_exthdr(struct rmnet_frag_descriptor *frag_desc,
+ 			if (!fp)
+ 				return -EINVAL;
+ 
+-			*fragp = *fp;
+-			if (ntohs(*fragp) & ~0x7)
++			*frag_offp = *fp;
++			*frag_hdrp = true;
++			if (ntohs(*frag_offp) & ~0x7)
+ 				break;
+ 			hdrlen = 8;
+ 		} else if (nexthdr == NEXTHDR_AUTH) {
+@@ -1143,6 +1146,7 @@ rmnet_frag_segment_coal_data(struct rmnet_frag_descriptor *coal_desc,
+ 		struct ipv6hdr *ip6h, __ip6h;
+ 		int ip_len;
+ 		__be16 frag_off;
++		bool frag_hdr;
+ 		u8 protocol;
+ 
+ 		ip6h = rmnet_frag_header_ptr(coal_desc, 0, sizeof(*ip6h),
+@@ -1155,10 +1159,11 @@ rmnet_frag_segment_coal_data(struct rmnet_frag_descriptor *coal_desc,
+ 		ip_len = rmnet_frag_ipv6_skip_exthdr(coal_desc,
+ 						     sizeof(*ip6h),
+ 						     &protocol,
+-						     &frag_off);
++						     &frag_off,
++						     &frag_hdr);
+ 		coal_desc->trans_proto = protocol;
+ 
+-		/* If we run into a problem, or this has a fragment header
++		/* If we run into a problem, or this is fragmented packet
+ 		 * (which should technically not be possible, if the HW
+ 		 * works as intended...), bail.
+ 		 */
+@@ -1167,6 +1172,14 @@ rmnet_frag_segment_coal_data(struct rmnet_frag_descriptor *coal_desc,
+ 			return;
+ 		}
+ 
++		if (frag_hdr) {
++			/* There is a fragment header, but this is not a
++			 * fragmented packet. We can handle this, but it
++			 * cannot be coalesced because of kernel limitations.
++			 */
++			gro = false;
++		}
++
+ 		coal_desc->ip_len = (u16)ip_len;
+ 		if (coal_desc->ip_len > sizeof(*ip6h)) {
+ 			/* Don't allow coalescing of any packets with IPv6
+@@ -1396,6 +1409,142 @@ rmnet_frag_data_check_coal_header(struct rmnet_frag_descriptor *frag_desc,
+ 	return 0;
+ }
+ 
++static int rmnet_frag_checksum_pkt(struct rmnet_frag_descriptor *frag_desc)
++{
++	struct rmnet_priv *priv = netdev_priv(frag_desc->dev);
++	struct rmnet_fragment *frag;
++	int offset = sizeof(struct rmnet_map_header) +
++		     sizeof(struct rmnet_map_v5_csum_header);
++	u8 *version, __version;
++	__wsum csum;
++	u16 csum_len;
++
++	version = rmnet_frag_header_ptr(frag_desc, offset, sizeof(*version),
++					&__version);
++	if (!version)
++		return -EINVAL;
++
++	if ((*version & 0xF0) == 0x40) {
++		struct iphdr *iph;
++		u8 __iph[60]; /* Max IP header size (0xF * 4) */
++
++		/* We need to access the entire IP header including options
++		 * to validate its checksum. Fortunately, the version byte
++		 * also will tell us the length, so we only need to pull
++		 * once ;)
++		 */
++		frag_desc->ip_len = (*version & 0xF) * 4;
++		iph = rmnet_frag_header_ptr(frag_desc, offset,
++					    frag_desc->ip_len,
++					    __iph);
++		if (!iph || ip_is_fragment(iph))
++			return -EINVAL;
++
++		/* Length needs to be sensible */
++		csum_len = ntohs(iph->tot_len);
++		if (csum_len > frag_desc->len - offset)
++			return -EINVAL;
++
++		csum_len -= frag_desc->ip_len;
++		/* IPv4 checksum must be valid */
++		if (ip_fast_csum((u8 *)iph, iph->ihl)) {
++			priv->stats.csum_sw++;
++			return 0;
++		}
++
++		frag_desc->ip_proto = 4;
++		frag_desc->trans_proto = iph->protocol;
++		csum = ~csum_tcpudp_magic(iph->saddr, iph->daddr,
++					  csum_len,
++					  frag_desc->trans_proto, 0);
++	} else if ((*version & 0xF0) == 0x60) {
++		struct ipv6hdr *ip6h, __ip6h;
++		int ip_len;
++		__be16 frag_off;
++		bool frag_hdr;
++		u8 protocol;
++
++		ip6h = rmnet_frag_header_ptr(frag_desc, offset, sizeof(*ip6h),
++					     &__ip6h);
++		if (!ip6h)
++			return -EINVAL;
++
++		frag_desc->ip_proto = 6;
++		protocol = ip6h->nexthdr;
++		ip_len = rmnet_frag_ipv6_skip_exthdr(frag_desc,
++						     offset + sizeof(*ip6h),
++						     &protocol, &frag_off,
++						     &frag_hdr);
++		if (ip_len < 0 || frag_off)
++			return -EINVAL;
++
++		/* Length needs to be sensible */
++		frag_desc->ip_len = (u16)ip_len;
++		csum_len = ntohs(ip6h->payload_len);
++		if (csum_len + frag_desc->ip_len > frag_desc->len - offset)
++			return -EINVAL;
++
++		frag_desc->trans_proto = protocol;
++		csum = ~csum_ipv6_magic(&ip6h->saddr, &ip6h->daddr,
++					csum_len,
++					frag_desc->trans_proto, 0);
++	} else {
++		/* Not checksumable */
++		return -EINVAL;
++	}
++
++	/* Protocol check */
++	if (frag_desc->trans_proto != IPPROTO_TCP &&
++	    frag_desc->trans_proto != IPPROTO_UDP)
++		return -EINVAL;
++
++	offset += frag_desc->ip_len;
++	/* Check for UDP zero csum packets */
++	if (frag_desc->trans_proto == IPPROTO_UDP) {
++		struct udphdr *uh, __uh;
++
++		uh = rmnet_frag_header_ptr(frag_desc, offset, sizeof(*uh),
++					   &__uh);
++		if (!uh)
++			return -EINVAL;
++
++		if (!uh->check) {
++			if (frag_desc->ip_proto == 4) {
++				/* Zero checksum is valid */
++				priv->stats.csum_sw++;
++				return 1;
++			}
++
++			/* Not valid in IPv6 */
++			priv->stats.csum_sw++;
++			return 0;
++		}
++	}
++
++	/* Walk the frags and checksum each chunk */
++	list_for_each_entry(frag, &frag_desc->frags, list) {
++		u32 frag_size = skb_frag_size(&frag->frag);
++
++		if (!csum_len)
++			break;
++
++		if (offset < frag_size) {
++			void *addr = skb_frag_address(&frag->frag) + offset;
++			u32 len = min_t(u32, csum_len, frag_size - offset);
++
++			/* Checksum 'len' bytes and add them in */
++			csum = csum_partial(addr, len, csum);
++			csum_len -= len;
++			offset = 0;
++		} else {
++			offset -= frag_size;
++		}
++	}
++
++	priv->stats.csum_sw++;
++	return !csum_fold(csum);
++}
++
+ /* Process a QMAPv5 packet header */
+ int rmnet_frag_process_next_hdr_packet(struct rmnet_frag_descriptor *frag_desc,
+ 				       struct rmnet_port *port,
+@@ -1440,7 +1589,18 @@ int rmnet_frag_process_next_hdr_packet(struct rmnet_frag_descriptor *frag_desc,
+ 			priv->stats.csum_ok++;
+ 			frag_desc->csum_valid = true;
+ 		} else {
+-			priv->stats.csum_valid_unset++;
++			int valid = rmnet_frag_checksum_pkt(frag_desc);
++
++			if (valid < 0) {
++				priv->stats.csum_validation_failed++;
++			} else if (valid) {
++				/* All's good */
++				priv->stats.csum_ok++;
++				frag_desc->csum_valid = true;
++			} else {
++				/* Checksum is actually bad */
++				priv->stats.csum_valid_unset++;
++			}
+ 		}
+ 
+ 		if (!rmnet_frag_pull(frag_desc, port,
+diff --git a/techpack/datarmnet/core/rmnet_descriptor.h b/techpack/datarmnet/core/rmnet_descriptor.h
+index f7bfa55bf..7117e4060 100644
+--- a/techpack/datarmnet/core/rmnet_descriptor.h
++++ b/techpack/datarmnet/core/rmnet_descriptor.h
+@@ -1,4 +1,5 @@
+ /* Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
++ * ​​​​Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.​
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -75,7 +76,8 @@ int rmnet_frag_descriptor_add_frags_from(struct rmnet_frag_descriptor *to,
+ 					 struct rmnet_frag_descriptor *from,
+ 					 u32 off, u32 len);
+ int rmnet_frag_ipv6_skip_exthdr(struct rmnet_frag_descriptor *frag_desc,
+-				int start, u8 *nexthdrp, __be16 *fragp);
++				int start, u8 *nexthdrp, __be16 *frag_offp,
++				bool *frag_hdrp);
+ 
+ /* QMAP command packets */
+ void rmnet_frag_command(struct rmnet_frag_descriptor *frag_desc,
+diff --git a/techpack/datarmnet/datarmnet_dlkm_vendor_board.mk b/techpack/datarmnet/datarmnet_dlkm_vendor_board.mk
+index 60a81a7d3..3eb26a9fc 100644
+--- a/techpack/datarmnet/datarmnet_dlkm_vendor_board.mk
++++ b/techpack/datarmnet/datarmnet_dlkm_vendor_board.mk
+@@ -2,8 +2,6 @@
+ DATA_DLKM_BOARD_PLATFORMS_LIST := lahaina
+ DATA_DLKM_BOARD_PLATFORMS_LIST += holi
+ DATA_DLKM_BOARD_PLATFORMS_LIST += monaco
+-DATA_DLKM_BOARD_PLATFORMS_LIST += monaco_go
+-DATA_DLKM_BOARD_PLATFORMS_LIST += monaco_go_aon
+ ifneq ($(TARGET_BOARD_AUTO),true)
+ ifeq ($(call is-board-platform-in-list,$(DATA_DLKM_BOARD_PLATFORMS_LIST)),true)
+ BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/rmnet_core.ko

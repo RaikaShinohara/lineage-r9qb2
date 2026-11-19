@@ -1,0 +1,30 @@
+From 3e08e7042334c3c5056290ae076c15f168adb2f4 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 13:30:37 +0000
+Subject: [PATCH 08/18] r9q: add QCA6490 Wi-Fi firmware
+
+---
+ proprietary-files.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index f6ca6aa..b2d478d 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -578,3 +578,16 @@ vendor/lib/libthreadutils.so
+ vendor/lib64/libthreadutils.so
+ vendor/lib/libatccore.so;DISABLE_CHECKELF
+ vendor/lib64/libatccore.so
++
++# WiFi - QCA6490 (firmware from G990B2XXS7GXF1)
++vendor/firmware/qca6490/amss20.bin
++vendor/firmware/qca6490/bdwlan.elf
++vendor/firmware/qca6490/bdwlan.elf1
++vendor/firmware/qca6490/bdwlan.elf10
++vendor/firmware/qca6490/bdwlan.elf2
++vendor/firmware/qca6490/bdwlang.elf
++vendor/firmware/qca6490/bdwlang.elf1
++vendor/firmware/qca6490/bdwlang.elf10
++vendor/firmware/qca6490/bdwlang.elf2
++vendor/firmware/qca6490/m3.bin
++vendor/firmware/qca6490/regdb.bin

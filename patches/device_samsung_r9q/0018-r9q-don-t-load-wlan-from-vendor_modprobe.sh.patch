@@ -1,0 +1,33 @@
+From e6d41841efc68f18da41bfd9d882a8fc33d4c349 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 15:57:26 +0000
+Subject: [PATCH 18/18] r9q: don't load wlan from vendor_modprobe.sh
+
+---
+ BoardConfig.mk    | 4 ++++
+ modules.blocklist | 1 +
+ 2 files changed, 5 insertions(+)
+ create mode 100644 modules.blocklist
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index f84d3a4..9617082 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -26,6 +26,10 @@ BOARD_NAME                 := SRPVC21A007
+ 
+ # Kernel modules
+ BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules.load))
++# vendor_modprobe.sh (early-init) loads every module with -b: wlan waits for
++# cnss2 calibration, which only starts in post-fs-data, blocking init for 70 s.
++# init.r9q.rc loads it on boot
++BOARD_VENDOR_KERNEL_MODULES_BLOCKLIST_FILE := $(DEVICE_PATH)/modules.blocklist
+ BOARD_RECOVERY_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules.load.recovery))
+ RECOVERY_KERNEL_MODULES := $(BOARD_RECOVERY_RAMDISK_KERNEL_MODULES_LOAD)
+ 
+diff --git a/modules.blocklist b/modules.blocklist
+new file mode 100644
+index 0000000..0a590b4
+--- /dev/null
++++ b/modules.blocklist
+@@ -0,0 +1 @@
++blocklist wlan

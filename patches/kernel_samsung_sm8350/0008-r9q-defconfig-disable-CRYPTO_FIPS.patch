@@ -1,0 +1,22 @@
+From cdaac36318c8a7e9317ce35edc3e9a882a6fbd8c Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 10:13:30 +0000
+Subject: [PATCH 08/12] r9q: defconfig: disable CRYPTO_FIPS
+
+---
+ arch/arm64/configs/vendor/r9q_eur_openx2_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/vendor/r9q_eur_openx2_defconfig b/arch/arm64/configs/vendor/r9q_eur_openx2_defconfig
+index 7e105cbe3..f29fc3824 100644
+--- a/arch/arm64/configs/vendor/r9q_eur_openx2_defconfig
++++ b/arch/arm64/configs/vendor/r9q_eur_openx2_defconfig
+@@ -6825,7 +6825,7 @@ CONFIG_CRYPTO=y
+ #
+ # Crypto core or helper
+ #
+-CONFIG_CRYPTO_FIPS=y
++# CONFIG_CRYPTO_FIPS is not set
+ CONFIG_CRYPTO_ALGAPI=y
+ CONFIG_CRYPTO_ALGAPI2=y
+ CONFIG_CRYPTO_AEAD=y

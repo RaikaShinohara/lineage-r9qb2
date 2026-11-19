@@ -1,0 +1,80 @@
+From 190c159e139df4dbcbe13cf3ec6f8fdc912a3211 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 21:34:22 +0000
+Subject: [PATCH 17/18] r9q: fix camera open
+
+Patch a null mutex crash in chi.override and link the sensorndkbridge shim.
+---
+ extract-files.py      | 24 ++++++++++++++++++++++++
+ proprietary-files.txt |  6 +++---
+ 2 files changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/extract-files.py b/extract-files.py
+index 10891b0..b898ba2 100755
+--- a/extract-files.py
++++ b/extract-files.py
+@@ -40,9 +40,33 @@ blob_fixups: blob_fixups_user_type = {
+         .add_needed('libhidlbase_shim_sm8350.so')
+         .binary_regex_replace(b'_ZN7android8hardware22configureRpcThreadpoolEmb',
+                               b'_ZN7android8hardware22configureRpcTh_pathcedEmb'),
++    # ALooper_*_forCamera from Samsung's libsensorndkbridge; without them CamX can't
++    # load com.ss.stats.aec and aborts when opening any camera
++    (
++        'vendor/lib/libsensorlistener.so',
++        'vendor/lib/libvdis_core.so',
++        'vendor/lib64/libhypermotion_core.so',
++        'vendor/lib64/libsensorlistener.so',
++        'vendor/lib64/libvdis_core.so',
++    ): blob_fixup()
++        .add_needed('libsensorndkbridge_shim.so'),
+     'vendor/lib64/hw/camera.qcom.so': blob_fixup()
+         .binary_regex_replace(b'ro.boot.flash.locked', b'ro.camera.notify_nfc'),
+     'vendor/lib64/hw/com.qti.chi.override.so': blob_fixup()
++        # SecUsecaseFastAec::Initialize creates its mutex after Session::Initialize, but the
++        # pipeline finalize thread notifies earlier: SessionCbNotifyMessage locks a null
++        # mutex and crashes the provider on camera open. The callback only logs, so
++        # make it return right away (GXF1)
++        .sig_replace(
++            'FF C3 00 D1 FD 7B 01 A9 FD 43 00 91 F4 4F 02 A9 34 00 40 F9 F3 03 00 AA 14 01 00 B4 88 02 40 F9 '
++            '2A 09 00 B0 4A A1 02 91 0B 5E 84 52 4C 01 0B 8B 1F 01 0C EB E1 00 00 54 28 08 40 B9 28 02 00 34 '
++            'F4 4F 42 A9 FD 7B 41 A9 FF C3 00 91 C0 03 5F D6 60 F4 94 D2 62 1B 00 F0 20 DC A5 F2 42 C0 13 91 '
++            'A0 76 C1 F2 E1 07 00 F9 20 58 FA F2 E1 03 08 AA 9A 74 04 94 E1 07 40 F9 28 08 40 B9 28 FE FF 35',
++            'FF C3 00 D1 FD 7B 01 A9 FD 43 00 91 F4 4F 02 A9 34 00 40 F9 F3 03 00 AA 14 01 00 B4 88 02 40 F9 '
++            '2A 09 00 B0 4A A1 02 91 0B 5E 84 52 4C 01 0B 8B 1F 01 0C EB E1 00 00 54 28 08 40 B9 1F 20 03 D5 '
++            'F4 4F 42 A9 FD 7B 41 A9 FF C3 00 91 C0 03 5F D6 60 F4 94 D2 62 1B 00 F0 20 DC A5 F2 42 C0 13 91 '
++            'A0 76 C1 F2 E1 07 00 F9 20 58 FA F2 E1 03 08 AA 9A 74 04 94 E1 07 40 F9 28 08 40 B9 F1 FF FF 17'
++        )
+         .sig_replace(
+             '80 06 40 F9 2D 79 00 94 80 01 00 34 A2 DB FF B0 C3 DD FF D0 A5 DC FF F0 E6 03 00 2A',
+             '1F 20 03 D5 1F 20 03 D5 1F 20 03 D5 1F 20 03 D5 1F 20 03 D5 1F 20 03 D5 1F 20 03 D5'
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 6392a87..875c312 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -543,7 +543,7 @@ vendor/lib64/libcom.qti.chinodeutils.so
+ vendor/lib/libuniplugin.so
+ vendor/lib64/libuniplugin.so
+ vendor/lib/libsensorlistener.so;DISABLE_CHECKELF
+-vendor/lib64/libsensorlistener.so;DISABLE_CHECKELF
++vendor/lib64/libsensorlistener.so
+ vendor/lib/libsrib_videobokeh_engine.camera.samsung.so;DISABLE_CHECKELF
+ vendor/lib64/libsrib_videobokeh_engine.camera.samsung.so
+ vendor/lib/libsrib_CNNInterface.camera.samsung.so;DISABLE_CHECKELF
+@@ -563,7 +563,7 @@ vendor/lib64/libbitmlengine.so
+ vendor/lib/libmmcamera_mfnr.so;DISABLE_CHECKELF
+ vendor/lib64/libmmcamera_mfnr.so
+ vendor/lib/libvdis_core.so;DISABLE_CHECKELF
+-vendor/lib64/libvdis_core.so;DISABLE_CHECKELF
++vendor/lib64/libvdis_core.so
+ vendor/lib/libbitmlenginev2.so;DISABLE_CHECKELF
+ vendor/lib64/libbitmlenginev2.so
+ vendor/lib/vendor.qti.hardware.camera.postproc@1.0-service-impl.so;DISABLE_CHECKELF
+@@ -684,7 +684,7 @@ vendor/lib64/libcvp_util.so;DISABLE_CHECKELF
+ vendor/lib64/libface_landmark.arcsoft.so;DISABLE_CHECKELF
+ vendor/lib64/libfocuspeaking.so;DISABLE_CHECKELF
+ vendor/lib64/libfocuspeaking_interface.so;DISABLE_CHECKELF
+-vendor/lib64/libhypermotion_core.so;DISABLE_CHECKELF
++vendor/lib64/libhypermotion_core.so
+ vendor/lib64/libhypermotion_interface.so;DISABLE_CHECKELF
+ vendor/lib64/libipebpsstriping.so;DISABLE_CHECKELF
+ vendor/lib64/libjpegQtable_interface.so;DISABLE_CHECKELF

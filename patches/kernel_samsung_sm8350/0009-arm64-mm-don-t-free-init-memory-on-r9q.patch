@@ -1,0 +1,30 @@
+From ad7bff2d59a03332889e693f754b5410f9b8730c Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 13:30:27 +0000
+Subject: [PATCH 09/12] arm64: mm: don't free init memory on r9q
+
+Zeroing .init hangs the SoC; leave it allocated for now.
+---
+ arch/arm64/mm/init.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f046ed401..660c56a40 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -692,6 +692,15 @@ void __init mem_init(void)
+ 
+ void free_initmem(void)
+ {
++	/*
++	 * r9q: zeroing .init through the linear map (free_reserved_area
++	 * memset) hangs the SoC until the non-secure watchdog bites
++	 * (TZBSP_ERR_FATAL_NON_SECURE_WDT). Keep it allocated until the cause
++	 * is found, it is only ~2 MB.
++	 */
++	if (IS_ENABLED(CONFIG_SEC_R9Q_PROJECT))
++		return;
++
+ 	free_reserved_area(lm_alias(__init_begin),
+ 			   lm_alias(__init_end),
+ 			   0, "unused kernel");

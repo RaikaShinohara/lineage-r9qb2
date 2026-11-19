@@ -1,0 +1,26 @@
+From 04274b1da85572524c387f93f24cacef5057511f Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 17:54:30 +0000
+Subject: [PATCH 15/18] r9q: shim libhidlbase for camera postproc
+
+---
+ extract-files.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/extract-files.py b/extract-files.py
+index 48797f0..682ea4b 100755
+--- a/extract-files.py
++++ b/extract-files.py
+@@ -33,6 +33,12 @@ blob_fixups: blob_fixups_user_type = {
+     # android::base::Trim(const std::string&) is gone from Android 16's libbase
+     'vendor/lib64/nfc_nci_nxpsn.so': blob_fixup()
+         .add_needed('libbase_shim.so'),
++    # Loaded inside the camera provider with the binder pool already running, and
++    # Android 16's libhidlbase aborts ("Binder threadpool cannot be shrunk")
++    'vendor/lib64/vendor.qti.hardware.camera.postproc@1.0-service-impl.so': blob_fixup()
++        .add_needed('libhidlbase_shim_sm8350.so')
++        .binary_regex_replace(b'_ZN7android8hardware22configureRpcThreadpoolEmb',
++                              b'_ZN7android8hardware22configureRpcTh_pathcedEmb'),
+     'vendor/lib64/hw/camera.qcom.so': blob_fixup()
+         .binary_regex_replace(b'ro.boot.flash.locked', b'ro.camera.notify_nfc'),
+     'vendor/lib64/hw/com.qti.chi.override.so': blob_fixup()

@@ -1,0 +1,22 @@
+From 9e18b2ccc8b9ecff151e72b52edb655a7b61ed7f Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 08:54:14 +0000
+Subject: [PATCH 05/18] r9q: skip check_elf for 32-bit libcamxfdengine
+
+---
+ proprietary-files.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index e6a43a3..b99d32f 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -144,7 +144,7 @@ vendor/lib/libcamera_nn_stub.so
+ vendor/lib/libcamxexternalformatutils.so
+ vendor/lib/libcamxfacialfeatures.so
+ vendor/lib/libcamxfdalgo.so
+-vendor/lib/libcamxfdengine.so
++vendor/lib/libcamxfdengine.so;DISABLE_CHECKELF
+ vendor/lib/libcamxifestriping.so
+ vendor/lib/libcamximageformatutils.so
+ vendor/lib/libcamxqsatalgo.so

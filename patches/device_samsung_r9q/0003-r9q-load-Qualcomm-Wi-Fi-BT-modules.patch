@@ -1,0 +1,41 @@
+From 2edf0939e0c67d41a9e80df6c6f7c85087ce80ec Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 21:13:04 +0000
+Subject: [PATCH 03/18] r9q: load Qualcomm Wi-Fi/BT modules
+
+---
+ modules.load | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/modules.load b/modules.load
+index 4a512f9..88f67fc 100644
+--- a/modules.load
++++ b/modules.load
+@@ -1,11 +1,15 @@
+ adsp_loader_dlkm.ko
+ apr_dlkm.ko
+-bcm4361.ko
+ blk-sec-stats.ko
+-bluesleep.ko
+ bolero_cdc_dlkm.ko
++bt_fm_slim.ko
++btpower.ko
+ camera.ko
+-dhd.ko
++cnss2.ko
++cnss_nl.ko
++cnss_prealloc.ko
++cnss_utils.ko
++device_management_service_v01.ko
+ fingerprint.ko
+ fingerprint_sysfs.ko
+ hdmi_dlkm.ko
+@@ -51,4 +55,6 @@ tcp_westwood.ko
+ tx_macro_dlkm.ko
+ va_macro_dlkm.ko
+ wcd9xxx_dlkm.ko
+-wcd_core_dlkm.ko
+\ No newline at end of file
++wcd_core_dlkm.ko
++wlan_firmware_service_v01.ko
++wlan.ko

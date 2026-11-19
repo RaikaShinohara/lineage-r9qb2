@@ -1,0 +1,71 @@
+From e5e0163307928a9d5bb25d5f5566908089d09d69 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 16:27:19 +0000
+Subject: [PATCH 11/18] r9q: add missing CamX blobs
+
+---
+ proprietary-files.txt | 54 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+
+diff --git a/proprietary-files.txt b/proprietary-files.txt
+index 9cb260c..bfb9dfa 100644
+--- a/proprietary-files.txt
++++ b/proprietary-files.txt
+@@ -591,3 +591,57 @@ vendor/firmware/qca6490/bdwlang.elf10
+ vendor/firmware/qca6490/bdwlang.elf2
+ vendor/firmware/qca6490/m3.bin
+ vendor/firmware/qca6490/regdb.bin
++
++# CamX: usecases, features and settings (CSL fails without com.qti.settings.sm8350)
++vendor/lib/com.qti.chiusecaseselector.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.anchorsync.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.demux.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.derivedoffline.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.frameselect.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.fusion.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.generic.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.gs.sm8350.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.hdr.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.mcreprocrt.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.memcpy.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.mfsr.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.ml.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.mux.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.qcfa.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.rawhdr.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.realtimeserializer.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.rt.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.rtmcx.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.serializer.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.statsregeneration.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.stub.so;DISABLE_CHECKELF
++vendor/lib/com.qti.feature2.swmf.so;DISABLE_CHECKELF
++vendor/lib/com.qti.settings.sm8350.so;DISABLE_CHECKELF
++vendor/lib/libarcsoft_super_night_auto_raw.so;DISABLE_CHECKELF
++vendor/lib/libcamerapostproc.so;DISABLE_CHECKELF
++vendor/lib64/com.qti.chiusecaseselector.so
++vendor/lib64/com.qti.feature2.anchorsync.so
++vendor/lib64/com.qti.feature2.demux.so
++vendor/lib64/com.qti.feature2.derivedoffline.so
++vendor/lib64/com.qti.feature2.frameselect.so
++vendor/lib64/com.qti.feature2.fusion.so
++vendor/lib64/com.qti.feature2.generic.so
++vendor/lib64/com.qti.feature2.gs.sm8350.so
++vendor/lib64/com.qti.feature2.hdr.so
++vendor/lib64/com.qti.feature2.mcreprocrt.so
++vendor/lib64/com.qti.feature2.memcpy.so
++vendor/lib64/com.qti.feature2.mfsr.so
++vendor/lib64/com.qti.feature2.ml.so
++vendor/lib64/com.qti.feature2.mux.so
++vendor/lib64/com.qti.feature2.qcfa.so
++vendor/lib64/com.qti.feature2.rawhdr.so
++vendor/lib64/com.qti.feature2.realtimeserializer.so
++vendor/lib64/com.qti.feature2.rt.so
++vendor/lib64/com.qti.feature2.rtmcx.so
++vendor/lib64/com.qti.feature2.serializer.so
++vendor/lib64/com.qti.feature2.statsregeneration.so
++vendor/lib64/com.qti.feature2.stub.so
++vendor/lib64/com.qti.feature2.swmf.so
++vendor/lib64/com.qti.settings.sm8350.so
++vendor/lib64/libarcsoft_super_night_auto_raw.so
++vendor/lib64/libcamerapostproc.so

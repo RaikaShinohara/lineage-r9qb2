@@ -1,0 +1,35 @@
+From 085bc3784e454e25bf89550c77de14030cadce94 Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 16:14:30 +0000
+Subject: [PATCH 10/18] r9q: load qcacld on boot after cold boot calibration
+
+---
+ modules.load            | 1 -
+ rootdir/etc/init.r9q.rc | 5 +++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/modules.load b/modules.load
+index 88f67fc..cab8b0c 100644
+--- a/modules.load
++++ b/modules.load
+@@ -57,4 +57,3 @@ va_macro_dlkm.ko
+ wcd9xxx_dlkm.ko
+ wcd_core_dlkm.ko
+ wlan_firmware_service_v01.ko
+-wlan.ko
+diff --git a/rootdir/etc/init.r9q.rc b/rootdir/etc/init.r9q.rc
+index 6377b80..683d234 100755
+--- a/rootdir/etc/init.r9q.rc
++++ b/rootdir/etc/init.r9q.rc
+@@ -149,6 +149,11 @@ on boot
+     chown root system /sys/class/usb_notify/usb_control/usb_data_enabled
+     chmod 0664 /sys/class/usb_notify/usb_control/usb_data_enabled
+ 
++# WLAN: cnss2 rejects qcacld before cold boot calibration, which starts with
++# fs_ready in post-fs-data (init.target.rc); if still running, it waits for it
++on boot
++    exec_background u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -a -d /vendor/lib/modules wlan
++
+ # SWAP
+ on boot
+     write /proc/sys/vm/swappiness 160

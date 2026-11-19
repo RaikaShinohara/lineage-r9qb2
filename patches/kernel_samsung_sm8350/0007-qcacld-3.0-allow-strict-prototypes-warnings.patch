@@ -1,0 +1,20 @@
+From f87ba3fd7e8ed6675b14cb99eee9f70a06a4437d Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 09:18:37 +0000
+Subject: [PATCH 07/12] qcacld-3.0: allow strict-prototypes warnings
+
+---
+ drivers/staging/qcacld-3.0/Kbuild | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/staging/qcacld-3.0/Kbuild b/drivers/staging/qcacld-3.0/Kbuild
+index ffedd1bc5..0e670c6ec 100644
+--- a/drivers/staging/qcacld-3.0/Kbuild
++++ b/drivers/staging/qcacld-3.0/Kbuild
+@@ -3916,3 +3916,6 @@ OBJS_DIRS += $(dir $(OBJS)) \
+ CLEAN_DIRS := $(addsuffix *.o,$(sort $(OBJS_DIRS))) \
+ 	      $(addsuffix .*.o.cmd,$(sort $(OBJS_DIRS)))
+ clean-files := $(CLEAN_DIRS)
++
++# clang 19: the kernel Makefile forces -Werror=strict-prototypes, which this driver does not meet
++ccflags-y += -Wno-error=strict-prototypes

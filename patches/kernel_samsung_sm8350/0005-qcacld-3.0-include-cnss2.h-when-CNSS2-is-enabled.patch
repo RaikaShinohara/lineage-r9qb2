@@ -1,0 +1,22 @@
+From a4cd45390ec92fc058d8279ff4fd41867453debb Mon Sep 17 00:00:00 2001
+From: RaikaShinohara <321751277+RaikaShinohara@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 22:00:47 +0000
+Subject: [PATCH 05/12] qcacld-3.0: include cnss2.h when CNSS2 is enabled
+
+---
+ drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c b/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
+index 942b01fc3..60f6ad753 100644
+--- a/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
++++ b/drivers/staging/qcacld-3.0/core/hdd/src/wlan_hdd_main.c
+@@ -85,7 +85,7 @@
+ #include <linux/ethtool.h>
+ 
+ #if defined (SEC_READ_MACADDR_SYSFS) || defined (SEC_WRITE_VERSION_IN_SYSFS) || defined (SEC_WRITE_SOFTAP_INFO_IN_SYSFS) || defined (SEC_CONFIG_PSM_SYSFS)
+-#ifdef CONFIG_LITHIUM
++#if defined(CONFIG_LITHIUM) || IS_ENABLED(CONFIG_CNSS2)
+ #include <net/cnss2.h>
+ #else
+ #include <soc/qcom/icnss2.h>
